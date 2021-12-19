@@ -59,6 +59,7 @@
 #include "TexFont.h"
 #include "vector2d.h"
 #include "OCPN_DataStreamEvent.h"
+#include <deque>
 
 #define EPL_TOOL_POSITION -1          // Request default positioning of toolbar tool
 
@@ -76,6 +77,10 @@
 //      Menu items
 #define ID_EPL_DELETE           8867
 #define ID_EPL_XMIT             8868
+
+//      Message IDs
+#define SIM_TIMER 5003
+#define HISTORY_FADE_SECS    10
 
 //----------------------------------------------------------------------------------------------------------
 //    Forward declarations
@@ -96,6 +101,21 @@ WX_DECLARE_OBJARRAY(vector2D *, ArrayOf2DPoints);
 //void RenderGLText( wxString &msg, wxFont *font, int xp, int yp, double angle);
 
 
+
+class transponder_state_history {
+public:
+  transponder_state_history(){};
+  ~transponder_state_history(){};
+
+  int ident;
+  int color_index;
+  double timeStamp;
+  double predicted_lat;
+  double predicted_lon;
+  double tsh_timer_age;
+
+};
+
 class transponder_state {
 public:
   transponder_state(){};
@@ -106,8 +126,9 @@ public:
   double timeStamp;
   double predicted_lat;
   double predicted_lon;
-};
+  std::deque<transponder_state_history *> historyQ;
 
+};
 
 //----------------------------------------------------------------------------------------------------------
 //    The PlugIn Class Definition
@@ -156,6 +177,7 @@ public:
       void SetPluginMessage(wxString &message_id, wxString &message_body);
 
       void ProcessTimerEvent( wxTimerEvent& event );
+      void ProcessSimTimerEvent( wxTimerEvent& event );
       void RenderFixHat( void );
       void ShowPreferencesDialog( wxWindow* parent );
 
@@ -171,6 +193,10 @@ public:
       void ProcessTenderFix( void );
 
       std::vector<transponder_state *>transponderStatus;
+
+      void startSim();
+      void stopSim();
+
 
 private:
       bool LoadConfig(void);
@@ -284,6 +310,10 @@ private:
      PlugIn_Waypoint        m_TrackedWP;
 
      RolloverWin            *m_pTrackRolloverWin;
+
+     wxTimer                m_simulatorTimer;
+     unsigned int           m_colorIndexNext;
+
 
      DECLARE_EVENT_TABLE();
 

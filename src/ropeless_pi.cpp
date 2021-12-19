@@ -87,6 +87,15 @@ WX_DEFINE_OBJARRAY(ArrayOf2DPoints);
 
 #include "default_pi.xpm"
 
+wxString colorTableNames[] = {
+  "MAGENTA",
+  "CYAN",
+  "LIME GREEN",
+  "ORANGE",
+  "MEDIUM GOLDENROD"
+};
+#define COLOR_TABLE_COUNT 5
+
 // the class factories, used to create and destroy instances of the PlugIn
 
 extern "C" DECL_EXP opencpn_plugin* create_pi( void *ppimgr )
@@ -188,6 +197,7 @@ void Clone_VP(PlugIn_ViewPort *dest, PlugIn_ViewPort *src)
 //      Event Handler implementation
 BEGIN_EVENT_TABLE ( ropeless_pi, wxEvtHandler )
 EVT_TIMER ( TIMER_THIS_PI, ropeless_pi::ProcessTimerEvent )
+EVT_TIMER ( SIM_TIMER, ropeless_pi::ProcessSimTimerEvent )
 END_EVENT_TABLE()
 
 ropeless_pi::ropeless_pi( void *ppimgr ) :
@@ -297,6 +307,7 @@ int ropeless_pi::Init( void )
 
     setTrackedWPSelect(m_trackedWPGUID);
 
+
     ///  Testing
 #if 0
     brg_line *brg = new brg_line(350, TRUE_BRG, 42.033, -70.183, 2.);
@@ -319,7 +330,10 @@ int ropeless_pi::Init( void )
 #endif
 
     wxString testm("$RIRFA,738430.606794,41.542906,-71.390697,358.5,0001,130.77,301.96,41.543528,-71.392030*6E\r\n");
-    SetNMEASentence( testm );
+    //SetNMEASentence( testm );
+
+    m_colorIndexNext = 0;
+    startSim();
 
     return (WANTS_OVERLAY_CALLBACK |
             WANTS_OPENGL_OVERLAY_CALLBACK |
@@ -711,6 +725,82 @@ void ropeless_pi::setTrackedWPSelect(wxString GUID)
     }
 }
 
+int n_tick;
+double countRun;
+double countTarget;
+double accelFactor;
+wxString pendingMsg;
+unsigned int inext;
+unsigned int msgCount;
+wxTextFile msgFile;
+double tstamp_current;
+
+void ropeless_pi::startSim()
+{
+    // Open the data file
+  msgFile.Open("/home/dsr/Projects/ropeless_pi/testset1.txt");
+  msgCount = msgFile.GetLineCount();
+  inext = 0;
+  n_tick = 0;
+
+  countRun = 0;
+  countTarget = 5;
+  accelFactor = 20;
+
+  m_simulatorTimer.SetOwner( this, SIM_TIMER );
+  m_simulatorTimer.Start(100, wxTIMER_CONTINUOUS);
+
+}
+
+void ropeless_pi::stopSim()
+{
+  m_simulatorTimer.Stop();
+
+}
+
+
+void ropeless_pi::ProcessSimTimerEvent( wxTimerEvent& event )
+{
+  n_tick++;
+  countRun += .100 * accelFactor;     // 100 msec basic timer
+
+  if(countRun < countTarget){
+    if( (n_tick %10) == 0){            // once per second
+      printf("next msg in: %g\n", countTarget-countRun);
+    }
+  }
+  else{
+    //  Send the pending msg
+    SetNMEASentence( pendingMsg );
+    RequestRefresh(GetOCPNCanvasWindow());
+
+    // Fetch the next message
+    if(inext < msgCount){
+      pendingMsg = msgFile.GetLine(inext);
+      pendingMsg.Append("\r\n");
+      inext++;
+
+      double tstamp_last = tstamp_current;
+
+      // parse the pending msg to get the timestamp
+      m_NMEA0183 << pendingMsg;
+
+      if( m_NMEA0183.PreParse() ) {
+        if( m_NMEA0183.Parse() ){
+          tstamp_current = m_NMEA0183.Rfa.TimeStamp;
+
+          if(inext > 1)
+            countTarget = (tstamp_current - tstamp_last) * 3600 * 24;
+          countRun = 0;
+        }
+      }
+    }
+    else{
+      stopSim();
+    }
+  }
+}
+
 
 
 void ropeless_pi::ProcessTimerEvent( wxTimerEvent& event )
@@ -756,6 +846,19 @@ void ropeless_pi::ProcessTimerEvent( wxTimerEvent& event )
         m_select->AddSelectablePoint( m_TrackedWP.m_lat, m_TrackedWP.m_lon, this, SELTYPE_ROUTEPOINT, 0 );
     }
 #endif
+
+    // Age the transponder history records
+    for (unsigned int i = 0 ; i < transponderStatus.size() ; i++){
+      transponder_state *state = transponderStatus[i];
+
+      std::deque<transponder_state_history *>::iterator it = state->historyQ.begin();
+      while (it != state->historyQ.end()){
+        transponder_state_history *tsh = *it++;
+        if (tsh->tsh_timer_age > 0)
+          tsh->tsh_timer_age--;
+      }
+    }
+
     RequestRefresh(GetOCPNCanvasWindow());
 
 }
@@ -1160,15 +1263,37 @@ void ropeless_pi::RenderIconGL( )
 
 void ropeless_pi::RenderTransponderDC(wxDC &dc, transponder_state *state)
 {
-    wxPoint ab;
-    GetCanvasPixLL(g_vp, &ab, state->predicted_lat, state->predicted_lon);
 
-    wxColour dcolour(255,000,255);
-    wxPen dpen( dcolour );
-    wxBrush dbrush( dcolour );
-    dc.SetPen( dpen );
-    dc.SetBrush( dbrush );
-    dc.DrawCircle( ab.x, ab.y, 10);
+    wxPoint ab;
+    wxString colorName = colorTableNames[state->color_index];
+    wxColour rcolour = wxTheColourDatabase->Find(colorName);
+    if (!rcolour.IsOk())
+      rcolour = wxColour(255,000,255);
+
+    // Render the primary instant transponder
+    GetCanvasPixLL(g_vp, &ab, state->predicted_lat, state->predicted_lon);
+    wxPen dpen( rcolour );
+    wxBrush dbrush( rcolour );
+    g_gdc->SetPen( dpen );
+    g_gdc->SetBrush( dbrush );
+    g_gdc->DrawEllipse( ab.x, ab.y, 20, 20);
+
+    // Render the history buffer, if present
+    std::deque<transponder_state_history *>::iterator it = state->historyQ.begin();
+    while (it != state->historyQ.end()){
+        transponder_state_history *tsh = *it++;
+
+        GetCanvasPixLL(g_vp, &ab, tsh->predicted_lat, tsh->predicted_lon);
+
+        wxColour hcolour(rcolour.Red(), rcolour.Green(), rcolour.Blue(),
+                         (tsh->tsh_timer_age / HISTORY_FADE_SECS) * 254);
+        wxPen dpen( rcolour );
+        wxBrush dbrush( hcolour );
+        g_gdc->SetPen( dpen );
+        g_gdc->SetBrush( dbrush );
+        g_gdc->DrawEllipse( ab.x, ab.y, 10,10);
+        //printf("render alpha: %g\n", (tsh->tsh_timer_age / HISTORY_FADE_SECS) * 254);
+    }
 }
 
 
@@ -1176,7 +1301,6 @@ void ropeless_pi::RenderTransponderDC(wxDC &dc, transponder_state *state)
 
 void ropeless_pi::RenderTrawlsDC(wxDC &dc)
 {
-
     //  Walk the vector of transponcer status
   for (unsigned int i = 0 ; i < transponderStatus.size() ; i++){
     transponder_state *state = transponderStatus[i];
@@ -1184,8 +1308,6 @@ void ropeless_pi::RenderTrawlsDC(wxDC &dc)
     RenderTransponderDC(dc, state);
 
   }
-
-
 }
 
 
@@ -1295,13 +1417,34 @@ void ropeless_pi::ProcessRFACapture( void )
     }
   }
 
-  // If not present, creak a new record, and add to vector
+  // If not present, create a new record, and add to vector
   if (this_transponder_state == NULL){
     this_transponder_state = new transponder_state;
+
+    // Select a new color for this new transponder
+    this_transponder_state->color_index = m_colorIndexNext;
+    m_colorIndexNext++;
+    if(m_colorIndexNext == COLOR_TABLE_COUNT)
+      m_colorIndexNext = 0;
+
     transponderStatus.push_back( this_transponder_state );
   }
+  else {                         // Maintain history buffer
+    transponder_state_history *this_transponder_state_history = new transponder_state_history;
+    this_transponder_state_history->ident = this_transponder_state->ident;
+    this_transponder_state_history->timeStamp = this_transponder_state->timeStamp;
+    this_transponder_state_history->predicted_lat = this_transponder_state->predicted_lat;
+    this_transponder_state_history->predicted_lon = this_transponder_state->predicted_lon;
+    this_transponder_state_history->color_index = this_transponder_state->color_index;
+    this_transponder_state_history->tsh_timer_age = HISTORY_FADE_SECS;
 
-  //  Update the record
+    if (this_transponder_state->historyQ.size() > 10){
+        this_transponder_state->historyQ.pop_back();
+    }
+    this_transponder_state->historyQ.push_front(this_transponder_state_history);
+  }
+
+  //  Update the instant record
   this_transponder_state->ident = transponderIdent;
   this_transponder_state->timeStamp = m_NMEA0183.Rfa.TimeStamp;
 
@@ -1320,6 +1463,9 @@ void ropeless_pi::ProcessRFACapture( void )
 
 void ropeless_pi::SetNMEASentence( wxString &sentence )
 {
+    if (sentence.IsEmpty())
+      return;
+
     m_NMEA0183 << sentence;
 
     if( m_NMEA0183.PreParse() ) {
