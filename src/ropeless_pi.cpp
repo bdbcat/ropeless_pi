@@ -219,6 +219,8 @@ int ropeless_pi::Init( void )
     AddLocaleCatalog( _T("opencpn-ropeless_pi") );
     m_config_version = -1;
 
+    m_oDC = NULL;
+
     //  Configure the NMEA processor
     mHDx_Watchdog = 2;
     mHDT_Watchdog = 2;
@@ -1133,6 +1135,7 @@ void ropeless_pi::RenderIconDC(wxDC &dc )
 
 void ropeless_pi::RenderIconGL( )
 {
+#if 0
        wxPoint ab;
     GetCanvasPixLL(g_vp, &ab, gLat, gLon);
 
@@ -1258,10 +1261,10 @@ void ropeless_pi::RenderIconGL( )
 
     }
 
-
+#endif
 }
 
-void ropeless_pi::RenderTransponderDC(wxDC &dc, transponder_state *state)
+void ropeless_pi::RenderTransponder( transponder_state *state)
 {
 
     wxPoint ab;
@@ -1274,10 +1277,11 @@ void ropeless_pi::RenderTransponderDC(wxDC &dc, transponder_state *state)
     GetCanvasPixLL(g_vp, &ab, state->predicted_lat, state->predicted_lon);
     wxPen dpen( rcolour );
     wxBrush dbrush( rcolour );
-    g_gdc->SetPen( dpen );
-    g_gdc->SetBrush( dbrush );
-    g_gdc->DrawEllipse( ab.x, ab.y, 20, 20);
+    m_oDC->SetPen( dpen );
+    m_oDC->SetBrush( dbrush );
+    m_oDC->DrawEllipse( ab.x, ab.y, 20, 20);
 
+#if 1
     // Render the history buffer, if present
     std::deque<transponder_state_history *>::iterator it = state->historyQ.begin();
     while (it != state->historyQ.end()){
@@ -1289,23 +1293,24 @@ void ropeless_pi::RenderTransponderDC(wxDC &dc, transponder_state *state)
                          (tsh->tsh_timer_age / HISTORY_FADE_SECS) * 254);
         wxPen dpen( rcolour );
         wxBrush dbrush( hcolour );
-        g_gdc->SetPen( dpen );
-        g_gdc->SetBrush( dbrush );
-        g_gdc->DrawEllipse( ab.x, ab.y, 10,10);
+        m_oDC->SetPen( dpen );
+        m_oDC->SetBrush( dbrush );
+        m_oDC->DrawEllipse( ab.x, ab.y, 10,10);
         //printf("render alpha: %g\n", (tsh->tsh_timer_age / HISTORY_FADE_SECS) * 254);
     }
+#endif
 }
 
 
 
 
-void ropeless_pi::RenderTrawlsDC(wxDC &dc)
+void ropeless_pi::RenderTrawls()
 {
     //  Walk the vector of transponcer status
   for (unsigned int i = 0 ; i < transponderStatus.size() ; i++){
     transponder_state *state = transponderStatus[i];
 
-    RenderTransponderDC(dc, state);
+    RenderTransponder(state);
 
   }
 }
@@ -1313,33 +1318,40 @@ void ropeless_pi::RenderTrawlsDC(wxDC &dc)
 
 bool ropeless_pi::RenderOverlay(wxDC &dc, PlugIn_ViewPort *vp)
 {
+#if 0
     g_vp = vp;
     Clone_VP(&g_ovp, vp);                // deep copy
+
+    if (!m_oDC) m_oDC = new ODDC(dc);
+
+    m_oDC->SetVP(vp);
+
+
 
     double selec_radius = (10 / vp->view_scale_ppm) / (1852. * 60.);
     m_select->SetSelectLLRadius(selec_radius);
 
 
-#if wxUSE_GRAPHICS_CONTEXT
-    wxMemoryDC *pmdc;
-    pmdc = wxDynamicCast(&dc, wxMemoryDC);
-    wxGraphicsContext *pgc = wxGraphicsContext::Create( *pmdc );
-    g_gdc = pgc;
-    g_pdc = &dc;
-#else
-    g_pdc = &dc;
-#endif
+// #if wxUSE_GRAPHICS_CONTEXT
+//     wxMemoryDC *pmdc;
+//     pmdc = wxDynamicCast(&dc, wxMemoryDC);
+//     wxGraphicsContext *pgc = wxGraphicsContext::Create( *pmdc );
+//     g_gdc = pgc;
+//     g_pdc = &dc;
+// #else
+//     g_pdc = &dc;
+// #endif
 
     //Render
-    RenderTrawlsDC( dc );
+    //RenderTrawls();
     //RenderIconDC( dc );
 
 
-#if wxUSE_GRAPHICS_CONTEXT
-    delete g_gdc;
-#endif
+//#if wxUSE_GRAPHICS_CONTEXT
+//    delete g_gdc;
+//#endif
 
-#if 1
+#if 0
     if( m_pBrgRolloverWin && m_pBrgRolloverWin->IsActive() ) {
         dc.DrawBitmap( *(m_pBrgRolloverWin->GetBitmap()),
                        m_pBrgRolloverWin->GetPosition().x,
@@ -1354,14 +1366,19 @@ bool ropeless_pi::RenderOverlay(wxDC &dc, PlugIn_ViewPort *vp)
 
 
 #endif
-
+#endif
     return true;
 }
 
 bool ropeless_pi::RenderGLOverlay(wxGLContext *pcontext, PlugIn_ViewPort *vp)
 {
-    g_gdc = NULL;
-    g_pdc = NULL;
+    if (!m_oDC) m_oDC = new ODDC();
+
+    m_oDC->SetVP(vp);
+
+
+//     g_gdc = NULL;
+//     g_pdc = NULL;
 
     g_vp = vp;
     Clone_VP(&g_ovp, vp);                // deep copy
@@ -1370,6 +1387,8 @@ bool ropeless_pi::RenderGLOverlay(wxGLContext *pcontext, PlugIn_ViewPort *vp)
     m_select->SetSelectLLRadius(selec_radius);
 
     //Render
+    RenderTrawls();
+#if 0
     RenderIconGL(  );
 
     if( m_pBrgRolloverWin && m_pBrgRolloverWin->IsActive() ) {
@@ -1397,6 +1416,7 @@ bool ropeless_pi::RenderGLOverlay(wxGLContext *pcontext, PlugIn_ViewPort *vp)
         }
 
     }
+#endif
     return true;
 }
 
@@ -1746,6 +1766,7 @@ int ropeless_pi::CalculateFix( void )
 
 void ropeless_pi::RenderFixHat( void )
 {
+#if 0
     if(!m_nfix)
         return;                 // no fix
 
@@ -1776,7 +1797,7 @@ void ropeless_pi::RenderFixHat( void )
         AlphaBlendingPoly( g_pdc, m_hat_array.GetCount(), pta, m_FixHatColor, 250 );
 
     }
-
+#endif
 }
 
 
@@ -2013,6 +2034,7 @@ void brg_line::CalcLength(void)
 
 void brg_line::DrawInfoBox( void )
 {
+#if 0
     //  Calculate the points
     wxPoint ab;
     GetCanvasPixLL(g_vp, &ab, m_latA, m_lonA);
@@ -2153,13 +2175,14 @@ void brg_line::DrawInfoBox( void )
 //        pof->DrawGLLine(ab.x, ab.y, cd.x, cd.y, 2);
 #endif
      }
+#endif
 }
 
 
 
 void brg_line::DrawInfoAligned( void )
 {
-
+#if 0
     //  Calculate the points
     wxPoint ab;
     GetCanvasPixLL(g_vp, &ab, m_latA, m_lonA);
@@ -2208,6 +2231,7 @@ void brg_line::DrawInfoAligned( void )
 
         RenderText( g_pdc, g_gdc, info, m_Font, m_color_text, xp, yp, 90. - m_bearing_true + 180.);
     }
+#endif
 }
 
 void brg_line::Draw( void )
@@ -2226,7 +2250,7 @@ void brg_line::Draw( void )
     dwidth = wxMax(2, dwidth);
 
 //    printf("%g\n", dwidth);
-    RenderLine(g_pdc, g_gdc, ab.x, ab.y, cd.x, cd.y, m_color, dwidth);
+    //RenderLine(g_pdc, g_gdc, ab.x, ab.y, cd.x, cd.y, m_color, dwidth);
 
 }
 

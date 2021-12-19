@@ -53,6 +53,7 @@
 #include <wx/fontpicker.h>
 //#include "/home/dsr/Projects/opencpn_sf/opencpn/include/ocpn_plugin.h"
 #include "ocpn_plugin.h"
+#include "ODdc.h"
 
 #include "nmea0183/nmea0183.h"
 #include "PI_RolloverWin.h"
@@ -205,8 +206,8 @@ private:
       void setIcon( char ** xpm_bits);
       void RenderIconDC( wxDC &dc );
       void RenderIconGL( );
-      void RenderTransponderDC(wxDC &dc, transponder_state *state);
-      void RenderTrawlsDC(wxDC &dc);
+      void RenderTransponder(transponder_state *state);
+      void RenderTrawls();
 
 
       void ComputeShipScaleFactor(float icon_hdt, int ownShipWidth, int ownShipLength,
@@ -314,6 +315,7 @@ private:
      wxTimer                m_simulatorTimer;
      unsigned int           m_colorIndexNext;
 
+     ODDC                   *m_oDC;
 
      DECLARE_EVENT_TABLE();
 
