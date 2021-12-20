@@ -96,6 +96,8 @@ wxString colorTableNames[] = {
 };
 #define COLOR_TABLE_COUNT 5
 
+wxString msgFileName = "/home/dsr/Projects/ropeless_pi/testset1.txt";
+
 // the class factories, used to create and destroy instances of the PlugIn
 
 extern "C" DECL_EXP opencpn_plugin* create_pi( void *ppimgr )
@@ -331,11 +333,15 @@ int ropeless_pi::Init( void )
     m_select->AddSelectableSegment( brg->GetLatA(), brg->GetLonA(), brg->GetLatB(), brg->GetLonB(), brg, SEL_SEG );
 #endif
 
-    wxString testm("$RIRFA,738430.606794,41.542906,-71.390697,358.5,0001,130.77,301.96,41.543528,-71.392030*6E\r\n");
-    //SetNMEASentence( testm );
-
     m_colorIndexNext = 0;
-    startSim();
+
+    wxMenuItem *sim_item = new wxMenuItem(NULL, ID_PLAY_SIM, _("Start Ropeless Simulation") );
+    m_start_sim_id = AddCanvasContextMenuItem(sim_item, this );
+    SetCanvasContextMenuItemViz(m_start_sim_id, true);
+
+    wxMenuItem *sim_stop_item = new wxMenuItem(NULL, ID_STOP_SIM, _("Stop Simulation") );
+    m_stop_sim_id = AddCanvasContextMenuItem(sim_stop_item, this );
+    SetCanvasContextMenuItemViz(m_stop_sim_id, false);
 
     return (WANTS_OVERLAY_CALLBACK |
             WANTS_OPENGL_OVERLAY_CALLBACK |
@@ -348,7 +354,8 @@ int ropeless_pi::Init( void )
             WANTS_NMEA_SENTENCES      |
             WANTS_NMEA_EVENTS         |
             WANTS_PREFERENCES         |
-            WANTS_MOUSE_EVENTS
+            WANTS_MOUSE_EVENTS        |
+            INSTALLS_CONTEXTMENU_ITEMS
             );
 
 }
@@ -411,31 +418,45 @@ wxString ropeless_pi::GetLongDescription()
 
 }
 
+void ropeless_pi::OnContextMenuItemCallback(int id)
+{
+
+  if (id == m_start_sim_id){
+
+    wxString file;
+    int response = PlatformFileSelectorDialog(
+        NULL, &file, _("Select an NMEA text file"), *GetpPrivateApplicationDataLocation(), _T(""), _T("*.*"));
+
+    if (response == wxID_OK) {
+
+      msgFileName = file;
+      if(::wxFileExists(msgFileName)){
+
+        SetCanvasContextMenuItemViz(m_start_sim_id, false);
+        SetCanvasContextMenuItemViz(m_stop_sim_id, true);
+
+        startSim();
+      }
+    }
+  }
+  else if (id == m_stop_sim_id){
+    SetCanvasContextMenuItemViz(m_start_sim_id, true);
+    SetCanvasContextMenuItemViz(m_stop_sim_id, false);
+
+    stopSim();
+  }
+
+
+    //startSim();
+}
+
 void ropeless_pi::PopupMenuHandler( wxCommandEvent& event )
 {
     bool handled = false;
     switch( event.GetId() ) {
-        case ID_EPL_DELETE:
-            if(m_sel_brg){
 
-                // delete the selectable
-                if(m_pFind){
-                    m_select->DeleteSelectablePoint( m_sel_brg, SELTYPE_POINT_GENERIC, SEL_POINT_A );
-                    m_select->DeleteSelectablePoint( m_sel_brg, SELTYPE_POINT_GENERIC, SEL_POINT_B );
-                    m_select->DeleteSelectableSegment( m_sel_brg, SELTYPE_SEG_GENERIC, SEL_SEG );
-                }
-
-                //  Remove the bearing from the array
-                for(unsigned int i=0 ; i < m_brg_array.GetCount() ; i++){
-                    brg_line *pb = m_brg_array.Item(i);
-                    if(pb == m_sel_brg){
-                        m_brg_array.Detach(i);
-                    }
-                }
-
-                //  Finally, delete the bearing
-                delete m_sel_brg;
-            }
+        case ID_PLAY_SIM:
+            startSim();
 
             handled = true;
             break;
@@ -548,10 +569,16 @@ bool ropeless_pi::MouseEventHook( wxMouseEvent &event )
         }
     }
 
-
+#endif
 
     if( event.RightDown() ) {
+        //wxMenu* contextMenu = new wxMenu;
+        //wxMenuItem *sim_item = new wxMenuItem(contextMenu, ID_PLAY_SIM, _("Start Simulation") );
+        //contextMenu->Append(sim_item);
+        //GetOCPNCanvasWindow()->Connect( ID_PLAY_SIM, wxEVT_COMMAND_MENU_SELECTED,
+        //                                        wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, this );
 
+#if 0
         if( m_sel_brg || m_bshow_fix_hat){
 
             wxMenu* contextMenu = new wxMenu;
@@ -588,13 +615,14 @@ bool ropeless_pi::MouseEventHook( wxMouseEvent &event )
 
             bret = true;                // I have eaten this event
         }
-
+#endif
     }
 
     else if( event.LeftDown() ) {
     }
 
     else if(event.Dragging()){
+#if 0
         if(m_sel_brg){
             if( (SEL_POINT_A == m_sel_part) || (SEL_POINT_B == m_sel_part)){
                 double dx, dy;
@@ -686,8 +714,11 @@ bool ropeless_pi::MouseEventHook( wxMouseEvent &event )
                  bret = true;
             }
         }
+#endif
     }
+
     if( event.LeftUp() ) {
+#if 0
         if(m_sel_brg)
             bret = true;
 
@@ -695,9 +726,8 @@ bool ropeless_pi::MouseEventHook( wxMouseEvent &event )
         m_sel_brg = NULL;
 
         m_nfix = CalculateFix();
-
-    }
 #endif
+    }
     return bret;
 }
 
@@ -740,7 +770,7 @@ double tstamp_current;
 void ropeless_pi::startSim()
 {
     // Open the data file
-  msgFile.Open("/home/dsr/Projects/ropeless_pi/testset1.txt");
+  msgFile.Open(msgFileName);
   msgCount = msgFile.GetLineCount();
   inext = 0;
   n_tick = 0;
@@ -798,6 +828,9 @@ void ropeless_pi::ProcessSimTimerEvent( wxTimerEvent& event )
       }
     }
     else{
+      SetCanvasContextMenuItemViz(m_start_sim_id, true);
+      SetCanvasContextMenuItemViz(m_stop_sim_id, false);
+
       stopSim();
     }
   }
@@ -1266,6 +1299,7 @@ void ropeless_pi::RenderIconGL( )
 
 void ropeless_pi::RenderTransponder( transponder_state *state)
 {
+    int circle_size = 10;
 
     wxPoint ab;
     wxString colorName = colorTableNames[state->color_index];
@@ -1279,7 +1313,8 @@ void ropeless_pi::RenderTransponder( transponder_state *state)
     wxBrush dbrush( rcolour );
     m_oDC->SetPen( dpen );
     m_oDC->SetBrush( dbrush );
-    m_oDC->DrawEllipse( ab.x, ab.y, 20, 20);
+    m_oDC->DrawCircle( ab.x, ab.y, circle_size);
+
 
 #if 1
     // Render the history buffer, if present
@@ -1287,18 +1322,28 @@ void ropeless_pi::RenderTransponder( transponder_state *state)
     while (it != state->historyQ.end()){
         transponder_state_history *tsh = *it++;
 
-        GetCanvasPixLL(g_vp, &ab, tsh->predicted_lat, tsh->predicted_lon);
+        wxPoint abh;
+        GetCanvasPixLL(g_vp, &abh, tsh->predicted_lat, tsh->predicted_lon);
 
         wxColour hcolour(rcolour.Red(), rcolour.Green(), rcolour.Blue(),
                          (tsh->tsh_timer_age / HISTORY_FADE_SECS) * 254);
-        wxPen dpen( rcolour );
+        wxPen dpen( hcolour );
         wxBrush dbrush( hcolour );
         m_oDC->SetPen( dpen );
         m_oDC->SetBrush( dbrush );
-        m_oDC->DrawEllipse( ab.x, ab.y, 10,10);
-        //printf("render alpha: %g\n", (tsh->tsh_timer_age / HISTORY_FADE_SECS) * 254);
+        m_oDC->DrawCircle( abh.x, abh.y, circle_size/2);
     }
 #endif
+    // Draw an "X" over the prinary target
+    wxPoint x1(ab.x - circle_size * .707, ab.y - circle_size * .707);
+    wxPoint x2(ab.x + circle_size * .707, ab.y + circle_size * .707);
+    wxPoint x3(ab.x - circle_size * .707, ab.y + circle_size * .707);
+    wxPoint x4(ab.x + circle_size * .707, ab.y - circle_size * .707);
+    wxPen xpen( *wxBLACK, 3 );
+    m_oDC->SetPen( xpen );
+    m_oDC->DrawLine(x1.x, x1.y, x2.x, x2.y, true);
+    m_oDC->DrawLine(x3.x, x3.y, x4.x, x4.y, true);
+
 }
 
 

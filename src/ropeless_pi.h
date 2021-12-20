@@ -82,6 +82,8 @@
 //      Message IDs
 #define SIM_TIMER 5003
 #define HISTORY_FADE_SECS    10
+#define ID_PLAY_SIM 5058
+#define ID_STOP_SIM 5059
 
 //----------------------------------------------------------------------------------------------------------
 //    Forward declarations
@@ -164,6 +166,7 @@ public:
       void OnToolbarToolCallback(int id);
 //      void ShowPreferencesDialog( wxWindow* parent );
       void SetColorScheme(PI_ColorScheme cs);
+      void OnContextMenuItemCallback(int id);
 
       bool RenderOverlay(wxDC &dc, PlugIn_ViewPort *vp);
       bool RenderGLOverlay(wxGLContext *pcontext, PlugIn_ViewPort *vp);
@@ -316,6 +319,8 @@ private:
      unsigned int           m_colorIndexNext;
 
      ODDC                   *m_oDC;
+     int                    m_start_sim_id;
+     int                    m_stop_sim_id;
 
      DECLARE_EVENT_TABLE();
 
