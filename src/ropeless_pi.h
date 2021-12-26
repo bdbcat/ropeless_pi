@@ -54,6 +54,7 @@
 //#include "/home/dsr/Projects/opencpn_sf/opencpn/include/ocpn_plugin.h"
 #include "ocpn_plugin.h"
 #include "ODdc.h"
+#include "pugixml.hpp"
 
 #include "nmea0183/nmea0183.h"
 #include "PI_RolloverWin.h"
@@ -84,6 +85,13 @@
 #define HISTORY_FADE_SECS    10
 #define ID_PLAY_SIM 5058
 #define ID_STOP_SIM 5059
+#define ID_TRANSPONDER_LIST 5060
+
+enum {
+  tlICON = 0,
+  tlIDENT,
+  tlTIMESTAMP
+};  // Transponder list Columns;
 
 //----------------------------------------------------------------------------------------------------------
 //    Forward declarations
@@ -93,6 +101,8 @@ class Select;
 class SelectItem;
 class PI_EventHandler;
 class PI_OCP_DataStreamInput_Thread;
+class RopelessDialog;
+class OCPNListCtrl;
 
 WX_DECLARE_OBJARRAY(brg_line *, ArrayOfBrgLines);
 WX_DECLARE_OBJARRAY(vector2D *, ArrayOf2DPoints);
@@ -201,6 +211,14 @@ public:
       void startSim();
       void stopSim();
 
+     int  m_dialogSizeWidth;
+     int  m_dialogSizeHeight;
+     int  m_dialogPosX;
+     int  m_dialogPosY;
+
+     wxTimer m_simulatorTimer;
+     int m_start_sim_id, m_stop_sim_id;
+
 
 private:
       bool LoadConfig(void);
@@ -220,6 +238,13 @@ private:
 
 
       void ProcessRFACapture( void );
+
+      void SaveTransponderStatus();
+      void populateTransponderNode(pugi::xml_node &transponderNode,
+                                   transponder_state *state);
+      void LoadTransponderStatus();
+      bool parseTransponderNode(pugi::xml_node &transponderNode,
+                            transponder_state *state);
 
       int CalculateFix( void );
       void setTrackedWPSelect(wxString GUID);
@@ -315,12 +340,15 @@ private:
 
      RolloverWin            *m_pTrackRolloverWin;
 
-     wxTimer                m_simulatorTimer;
      unsigned int           m_colorIndexNext;
 
      ODDC                   *m_oDC;
-     int                    m_start_sim_id;
-     int                    m_stop_sim_id;
+
+     int                    m_leftclick_tool_id;
+
+     RopelessDialog         *m_pRLDialog;
+     wxWindow               *m_parent_window;
+
 
      DECLARE_EVENT_TABLE();
 
@@ -421,7 +449,7 @@ private:
 
 
 
-class TenderPrefsDialog : public wxDialog
+class RopelessDialog : public wxDialog
 {
 private:
 
@@ -453,10 +481,23 @@ public:
     wxTextCtrl *m_pTenderLength;
     wxTextCtrl *m_pTenderWidth;
 
+    wxTextCtrl *m_simTextCtrl;
+    wxButton   *m_ChooseFileButton, *m_StopSimButton, *m_StartSimButton;
 
-    TenderPrefsDialog( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = _("WMM Preferences"), const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxDefaultSize, long style = wxCAPTION|wxDEFAULT_DIALOG_STYLE );
-    ~TenderPrefsDialog();
+    ropeless_pi *pParentPi;
+    OCPNListCtrl *m_pListCtrlTranponders;
+
+    RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi, wxWindowID id = wxID_ANY, const wxString& title = _("Ropeless"), const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxDefaultSize, long style = wxCAPTION|wxDEFAULT_DIALOG_STYLE );
+    ~RopelessDialog();
     void OnTenderPrefsOkClick(wxCommandEvent& event);
+
+    void OnClose(wxCloseEvent& event);
+
+    void OnChooseFileButton(wxCommandEvent &event);
+    void OnStopSimButton(wxCommandEvent &event);
+    void OnStartSimButton(wxCommandEvent &event);
+    void RefreshTransponderList();
+
 
     DECLARE_EVENT_TABLE()
 

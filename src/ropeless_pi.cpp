@@ -38,6 +38,8 @@
 #include "OCP_DataStreamInput_Thread.h"
 #include "OCPN_DataStreamEvent.h"
 #include "georef.h"
+#include "OCPNListCtrl.h"
+#include "pugixml.hpp"
 
 #ifdef ocpnUSE_GL
 #include <GL/gl.h>
@@ -97,6 +99,18 @@ wxString colorTableNames[] = {
 #define COLOR_TABLE_COUNT 5
 
 wxString msgFileName = "/home/dsr/Projects/ropeless_pi/testset1.txt";
+
+wxDateTime DaysTowDT( double days )
+{
+  int daysRoundDown = (int)days;
+  int daysLinuxEpoch = daysRoundDown - 719528;
+
+  double fraction = days - daysRoundDown;
+  double fraction_secs = fraction * 24 * 3600;
+  time_t epochTime = (int)(daysLinuxEpoch * 24 * 3600) + (int)fraction_secs;
+  return wxDateTime(epochTime);
+}
+
 
 // the class factories, used to create and destroy instances of the PlugIn
 
@@ -260,6 +274,9 @@ int ropeless_pi::Init( void )
 //     GPS offset from midship = 2.6
 
 
+  //    Get a pointer to the opencpn display canvas, to use as a parent for the
+  //    POI Manager dialog
+    m_parent_window = GetOCPNCanvasWindow();
 
 
     gHdt = NAN;
@@ -311,6 +328,9 @@ int ropeless_pi::Init( void )
 
     setTrackedWPSelect(m_trackedWPGUID);
 
+    initialize_images();
+    m_pRLDialog = NULL;
+
 
     ///  Testing
 #if 0
@@ -333,6 +353,8 @@ int ropeless_pi::Init( void )
     m_select->AddSelectableSegment( brg->GetLatA(), brg->GetLonA(), brg->GetLatB(), brg->GetLonB(), brg, SEL_SEG );
 #endif
 
+    LoadTransponderStatus();    //Load persistant XML file
+
     m_colorIndexNext = 0;
 
     wxMenuItem *sim_item = new wxMenuItem(NULL, ID_PLAY_SIM, _("Start Ropeless Simulation") );
@@ -342,6 +364,12 @@ int ropeless_pi::Init( void )
     wxMenuItem *sim_stop_item = new wxMenuItem(NULL, ID_STOP_SIM, _("Stop Simulation") );
     m_stop_sim_id = AddCanvasContextMenuItem(sim_stop_item, this );
     SetCanvasContextMenuItemViz(m_stop_sim_id, false);
+
+    //    This PlugIn needs a toolbar icon, so request its insertion
+    m_leftclick_tool_id =
+    InsertPlugInTool(_T(""), _img_plus, _img_plus, wxITEM_NORMAL, _("Ropeless"),
+                         _T(""), NULL, -1, 0, this);
+
 
     return (WANTS_OVERLAY_CALLBACK |
             WANTS_OPENGL_OVERLAY_CALLBACK |
@@ -372,6 +400,22 @@ bool ropeless_pi::DeInit( void )
 //     int tsec = 2;
 //     while(tsec--)
 //         wxSleep(1);
+
+    RemovePlugInTool(m_leftclick_tool_id);
+
+    // Persist control dialog size/position
+    if (m_pRLDialog){
+        wxPoint p = m_pRLDialog->GetPosition();
+        m_dialogPosX = p.x;
+        m_dialogPosY = p.y;
+        wxSize s = m_pRLDialog->GetSize();
+        m_dialogSizeWidth = s.x;
+        m_dialogSizeHeight =s.y;
+    }
+
+    SaveConfig();
+
+    SaveTransponderStatus();      // Create XML file
 
     return true;
 }
@@ -417,6 +461,42 @@ wxString ropeless_pi::GetLongDescription()
     return _("Ropeless PlugIn for OpenCPN");
 
 }
+
+void ropeless_pi::OnToolbarToolCallback(int id) {
+  //if (!m_buseable) return;
+  if (NULL == m_pRLDialog) {
+    m_pRLDialog = new RopelessDialog(m_parent_window, this);
+    wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
+    m_pRLDialog->SetFont(*pFont);
+
+  }
+
+  //RearrangeWindow();
+  /*m_pRLDialog->SetMaxSize(m_pRLDialog->GetSize());
+  m_pRLDialog->SetMinSize(m_pRLDialog->GetSize());*/
+  m_pRLDialog->Show(!m_pRLDialog->IsShown());
+  m_pRLDialog->Layout();  // Some platforms need a re-Layout at this point
+                           // (gtk, at least)
+
+  if ((m_dialogSizeWidth > 0) && (m_dialogSizeHeight > 0))
+      m_pRLDialog->SetSize(wxSize(m_dialogSizeWidth, m_dialogSizeHeight));
+
+  if ((m_dialogPosX > 0) && (m_dialogPosY > 0))
+      m_pRLDialog->Move(wxPoint(m_dialogPosX, m_dialogPosY));
+
+
+//  wxPoint p = m_pRLDialog->GetPosition();
+//  m_pRLDialog->Move(0, 0);  // workaround for gtk autocentre dialog behavior
+//  m_pRLDialog->Move(p);
+
+#ifdef __OCPN__ANDROID__
+  m_pRLDialog->CentreOnScreen();
+  m_pRLDialog->Move(-1, 0);
+#endif
+
+  m_pRLDialog->RefreshTransponderList();    //Pick up initial XML load
+}
+
 
 void ropeless_pi::OnContextMenuItemCallback(int id)
 {
@@ -622,99 +702,6 @@ bool ropeless_pi::MouseEventHook( wxMouseEvent &event )
     }
 
     else if(event.Dragging()){
-#if 0
-        if(m_sel_brg){
-            if( (SEL_POINT_A == m_sel_part) || (SEL_POINT_B == m_sel_part)){
-                double dx, dy;
-                toSM_Plugin(m_cursor_lat, m_cursor_lon, m_sel_pt_lat, m_sel_pt_lon, &dx, &dy);
-                double distance = sqrt( (dx * dx) + (dy * dy));
-
-                double new_lat = m_sel_pt_lat;
-                double new_lon = m_sel_pt_lon;
-
-                double alpha = atan2(dx, dy);
-                if(alpha < 0)
-                    alpha += 2 * PI;
-
-                double brg_perp = (m_sel_brg->GetBearingTrue() - 90) * PI / 180.;
-                if(brg_perp < 0)
-                    brg_perp += 2 * PI;
-
-                double delta_alpha = alpha - brg_perp;
-                if(delta_alpha < 0)
-                    delta_alpha += 2 * PI;
-
-                double move_dist = distance * sin(delta_alpha);
-
-                double ndy = move_dist * cos(m_sel_brg->GetBearingTrue() * PI / 180.);
-                double ndx = move_dist * sin(m_sel_brg->GetBearingTrue() * PI / 180.);
-
-                fromSM_Plugin(ndx, ndy, m_sel_pt_lat, m_sel_pt_lon, &new_lat, &new_lon);
-
-                //  Update the brg line parameters
-                if(SEL_POINT_A == m_sel_part){
-                    m_sel_brg->m_latA = new_lat;
-                    m_sel_brg->m_lonA = new_lon;
-                }
-                else if(SEL_POINT_B == m_sel_part){
-                    m_sel_brg->m_latB = new_lat;
-                    m_sel_brg->m_lonB = new_lon;
-                }
-
-                m_sel_brg->CalcLength();
-
-                // Update the selectable items
-                if(m_pFind){
-                    m_select->DeleteSelectableSegment( m_sel_brg, SELTYPE_SEG_GENERIC, SEL_SEG );
-                    m_select->AddSelectableSegment( m_sel_brg->GetLatA(), m_sel_brg->GetLonA(),
-                                                    m_sel_brg->GetLatB(), m_sel_brg->GetLonB(),
-                                                    m_sel_brg, SEL_SEG );
-
-                    m_pFind->m_slat = new_lat;
-                    m_pFind->m_slon = new_lon;
-                }
-
-                GetOCPNCanvasWindow()->Refresh();
-                bret = true;
-            }
-            else if(SEL_SEG == m_sel_part){
-
-                 //  Get the Mercator offsets from original select point to this drag point
-                 double dx, dy;
-                 toSM_Plugin(m_cursor_lat, m_cursor_lon, m_sel_pt_lat, m_sel_pt_lon, &dx, &dy);
-
-                 //  Add in the offsets to item point "A"
-                 dx -= m_segdrag_ref_x;
-                 dy -= m_segdrag_ref_y;
-
-                 //   And calculate new position of item point "A"
-                 double nlatA, nlonA;
-                 fromSM_Plugin(dx, dy, m_sel_pt_lat, m_sel_pt_lon, &nlatA, &nlonA);
-
-                 //  Set point "A"
-                 m_sel_brg->m_latA = nlatA;
-                 m_sel_brg->m_lonA = nlonA;
-
-                 // Recalculate point "B"
-                 m_sel_brg->CalcPointB();
-
-                 // Update the selectable items
-                 m_select->DeleteSelectablePoint( m_sel_brg, SELTYPE_POINT_GENERIC, SEL_POINT_A );
-                 m_select->DeleteSelectablePoint( m_sel_brg, SELTYPE_POINT_GENERIC, SEL_POINT_B );
-                 m_select->DeleteSelectableSegment( m_sel_brg, SELTYPE_SEG_GENERIC, SEL_SEG );
-
-                 m_select->AddSelectablePoint( m_sel_brg->GetLatA(), m_sel_brg->GetLonA(), m_sel_brg, SELTYPE_POINT_GENERIC, SEL_POINT_A );
-                 m_select->AddSelectablePoint( m_sel_brg->GetLatB(), m_sel_brg->GetLonB(), m_sel_brg, SELTYPE_POINT_GENERIC, SEL_POINT_B );
-                 m_select->AddSelectableSegment( m_sel_brg->GetLatA(), m_sel_brg->GetLonA(),
-                                                 m_sel_brg->GetLatB(), m_sel_brg->GetLonB(),
-                                                 m_sel_brg, SEL_SEG );
-
-
-                 GetOCPNCanvasWindow()->Refresh();
-                 bret = true;
-            }
-        }
-#endif
     }
 
     if( event.LeftUp() ) {
@@ -898,6 +885,132 @@ void ropeless_pi::ProcessTimerEvent( wxTimerEvent& event )
 
 }
 
+void ropeless_pi::populateTransponderNode(pugi::xml_node &transponderNode,
+                                   transponder_state *state)
+{
+  pugi::xml_node child;
+
+  child = transponderNode.append_child("ident");
+  wxString ss;
+  ss.Printf("%d", state->ident);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+
+  child = transponderNode.append_child("timeStamp");
+  ss.Printf("%f", state->timeStamp);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+
+  child = transponderNode.append_child("Lat");
+  ss.Printf("%f", state->predicted_lat);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+
+  child = transponderNode.append_child("Lon");
+  ss.Printf("%f", state->predicted_lon);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+
+}
+
+void ropeless_pi::SaveTransponderStatus(){
+
+    pugi::xml_document transponderStatusDoc;
+    pugi::xml_node transpondersNode = transponderStatusDoc.append_child("transponders");
+
+    pugi::xml_node childT = transpondersNode.append_child("version");
+    childT.append_child(pugi::node_pcdata).set_value("0.0.0");
+    childT = transpondersNode.append_child("date");
+    wxDateTime now = wxDateTime::GetTimeNow();
+    wxString timeFormat = now.FormatISOCombined(' ');
+    childT.append_child(pugi::node_pcdata).set_value(timeFormat.mb_str());
+
+    for (unsigned int i = 0 ; i < transponderStatus.size() ; i++){
+      transponder_state *state = transponderStatus[i];
+
+      pugi::xml_node transponderNode = transpondersNode.append_child("transponder");
+      pugi::xml_attribute version = transponderNode.append_attribute("version");
+      version.set_value("1");
+
+      populateTransponderNode(transponderNode, state);
+    }
+
+    wxString fileName = *GetpPrivateApplicationDataLocation() +
+                           wxFileName::GetPathSeparator() +
+                           _T("ropeless-transponders.xml");
+    transponderStatusDoc.save_file(fileName.mb_str(), "  ");
+}
+
+
+bool ropeless_pi::parseTransponderNode(pugi::xml_node &transponderNode, transponder_state *state)
+{
+
+     if (!strcmp(transponderNode.name(), "transponder")) {
+        for (pugi::xml_node child = transponderNode.first_child(); child;
+            child = child.next_sibling()) {
+
+          if (!strcmp(child.name(), "ident")) {
+            state->ident = atoi(child.first_child().value());
+          }
+          if (!strcmp(child.name(), "timeStamp")) {
+            wxString val(child.first_child().value());
+            double dval;
+            val.ToDouble(&dval);
+            state->timeStamp = dval;
+          }
+          if (!strcmp(child.name(), "Lat")) {
+            wxString val(child.first_child().value());
+            double dval;
+            val.ToDouble(&dval);
+            state->predicted_lat = dval;
+          }
+          if (!strcmp(child.name(), "Lon")) {
+            wxString val(child.first_child().value());
+            double dval;
+            val.ToDouble(&dval);
+            state->predicted_lon = dval;
+          }
+     }
+  }
+
+  return true;
+}
+
+void ropeless_pi::LoadTransponderStatus()
+{
+    pugi::xml_document transponderStatusXML;
+
+    wxString fileName = *GetpPrivateApplicationDataLocation() +
+                           wxFileName::GetPathSeparator() +
+                           _T("ropeless-transponders.xml");
+
+    bool ret = transponderStatusXML.load_file(fileName.mb_str());
+    if (ret) {
+      transponder_state state;
+      pugi::xml_node transponderRoot = transponderStatusXML.first_child();
+
+      if (!parseTransponderNode(transponderRoot, &state)) {
+        OCPNMessageBox_PlugIn(GetOCPNCanvasWindow(), _("Error processing Ropless Transponder status (XML) file."),
+                       _("OpenCPN Ropeless Plugin Error"));
+        return;
+      }
+    }
+
+    pugi::xml_node statusRoot = transponderStatusXML.first_child();
+    for (pugi::xml_node element = statusRoot.first_child(); element;
+         element = element.next_sibling()) {
+      if (!strcmp(element.name(), "transponder")) {
+        transponder_state *this_state = new transponder_state;;
+        if(parseTransponderNode(element, this_state)){
+          // Select a new color for this new transponder
+          this_state->color_index = m_colorIndexNext;
+          m_colorIndexNext++;
+          if(m_colorIndexNext == COLOR_TABLE_COUNT)
+            m_colorIndexNext = 0;
+
+          transponderStatus.push_back( this_state );
+        }
+        else
+          delete this_state;
+      }
+    }
+}
 
 void ropeless_pi::OnRolloverPopupTimerEvent( wxTimerEvent& event )
 {
@@ -1351,7 +1464,7 @@ void ropeless_pi::RenderTransponder( transponder_state *state)
 
 void ropeless_pi::RenderTrawls()
 {
-    //  Walk the vector of transponcer status
+    //  Walk the vector of transponder status
   for (unsigned int i = 0 ; i < transponderStatus.size() ; i++){
     transponder_state *state = transponderStatus[i];
 
@@ -1522,7 +1635,9 @@ void ropeless_pi::ProcessRFACapture( void )
     this_transponder_state->predicted_lon = -this_transponder_state->predicted_lon;
 
 
-
+  if(m_pRLDialog){
+    m_pRLDialog->RefreshTransponderList();
+  }
 }
 
 
@@ -1624,11 +1739,6 @@ void ropeless_pi::SetColorScheme( PI_ColorScheme cs )
 }
 
 
-void ropeless_pi::OnToolbarToolCallback( int id )
-{
-}
-
-
 bool ropeless_pi::LoadConfig( void )
 {
 
@@ -1637,6 +1747,13 @@ bool ropeless_pi::LoadConfig( void )
     if( pConf ) {
 
         pConf->SetPath ( _T( "/Settings/Ropeless_pi" ) );
+        pConf->Read("dialogSizeWidth", &m_dialogSizeWidth, -1);
+        pConf->Read("dialogSizeHeight", &m_dialogSizeHeight, -1);
+        pConf->Read("dialogPosX", &m_dialogPosX, -1);
+        pConf->Read("dialogPosY", &m_dialogPosY, -1);
+
+
+
         pConf->Read ( _T( "SerialPort" ),  &m_serialPort );
         pConf->Read ( _T( "TrackedPoint" ),  &m_trackedWPGUID );
 
@@ -1679,14 +1796,21 @@ bool ropeless_pi::SaveConfig( void )
     if( pConf ) {
 
         pConf->SetPath ( _T( "/Settings/Ropeless_pi" ) );
-        pConf->Write ( _T( "SerialPort" ),  m_serialPort );
-        pConf->Write ( _T( "TrackedPoint" ),  m_trackedWPGUID );
 
-        pConf->Write ( _T( "TenderLength" ),  m_tenderLength );
-        pConf->Write ( _T( "TenderWidth" ),  m_tenderWidth );
-        pConf->Write ( _T( "TenderGPSOffsetX" ),  m_tenderGPS_x );
-        pConf->Write ( _T( "TenderGPSOffsetY" ),  m_tenderGPS_y );
-        pConf->Write ( _T( "TenderIconType" ),  m_tenderIconType );
+        pConf->Write ( "dialogSizeWidth",  m_dialogSizeWidth );
+        pConf->Write ( "dialogSizeHeight",  m_dialogSizeHeight );
+        pConf->Write ( "dialogPosX",  m_dialogPosX );
+        pConf->Write ( "dialogPosY",  m_dialogPosY );
+
+
+//         pConf->Write ( _T( "SerialPort" ),  m_serialPort );
+//         pConf->Write ( _T( "TrackedPoint" ),  m_trackedWPGUID );
+//
+//         pConf->Write ( _T( "TenderLength" ),  m_tenderLength );
+//         pConf->Write ( _T( "TenderWidth" ),  m_tenderWidth );
+//         pConf->Write ( _T( "TenderGPSOffsetX" ),  m_tenderGPS_x );
+//         pConf->Write ( _T( "TenderGPSOffsetY" ),  m_tenderGPS_y );
+//         pConf->Write ( _T( "TenderIconType" ),  m_tenderIconType );
 
         return true;
     } else
@@ -1897,6 +2021,7 @@ void ropeless_pi::stopSerial()
 
 void ropeless_pi::ShowPreferencesDialog( wxWindow* parent )
 {
+#if 0
     TenderPrefsDialog *dialog = new TenderPrefsDialog( parent, wxID_ANY, _("Ropeless_pi Preferences"), wxPoint( 20, 20), wxDefaultSize, wxDEFAULT_DIALOG_STYLE );
     dialog->Fit();
     wxColour cl;
@@ -1950,6 +2075,7 @@ void ropeless_pi::ShowPreferencesDialog( wxWindow* parent )
 
     }
     delete dialog;
+#endif
 }
 
 void ropeless_pi::ProcessTenderFix( void )
@@ -2444,17 +2570,109 @@ void PI_EventHandler::OnEvtOCPN_NMEA( PI_OCPN_DataStreamEvent& event )
 
 wxArrayString *EnumerateSerialPorts( void );
 
-BEGIN_EVENT_TABLE( TenderPrefsDialog, wxDialog )
-EVT_BUTTON( wxID_OK, TenderPrefsDialog::OnTenderPrefsOkClick )
+BEGIN_EVENT_TABLE( RopelessDialog, wxDialog )
+EVT_BUTTON( wxID_OK, RopelessDialog::OnTenderPrefsOkClick )
+EVT_CLOSE(RopelessDialog::OnClose)
 END_EVENT_TABLE()
 
-TenderPrefsDialog::TenderPrefsDialog( wxWindow* parent, wxWindowID id, const wxString& title, const wxPoint& pos, const wxSize& size, long style ) : wxDialog( parent, id, title, pos, size, style )
+RopelessDialog::RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi,
+                                wxWindowID id, const wxString& title,
+                                const wxPoint& pos, const wxSize& size, long style )
+            : wxDialog( parent, id, title, pos, size, style )
 {
+        pParentPi = parent_pi;
 
         this->SetSizeHints( wxDefaultSize, wxDefaultSize );
 
         wxBoxSizer* bSizer2;
         bSizer2 = new wxBoxSizer( wxVERTICAL );
+
+        // The transponder list
+        long flags = wxLC_REPORT | wxLC_SINGLE_SEL | wxLC_HRULES | wxLC_VRULES |
+               wxBORDER_SUNKEN;
+
+        m_pListCtrlTranponders = new OCPNListCtrl(this, ID_TRANSPONDER_LIST, wxDefaultPosition, wxDefaultSize, flags);
+        bSizer2->Add(m_pListCtrlTranponders, 1, wxEXPAND | wxALL, 0);
+
+        int dx = GetCharWidth();
+
+        int colWidth = dx * 6;
+        m_pListCtrlTranponders->InsertColumn(tlICON, _("Color"), wxLIST_FORMAT_LEFT,  colWidth);
+
+        colWidth = dx * 6;
+        m_pListCtrlTranponders->InsertColumn(tlIDENT, _("Ident"), wxLIST_FORMAT_LEFT,  colWidth);
+
+        colWidth = dx * 18;
+        m_pListCtrlTranponders->InsertColumn(tlTIMESTAMP, _("LastReportTime (UTC)"), wxLIST_FORMAT_LEFT, colWidth);
+
+        // Build the color indicator bitmaps, adding to an image lst
+        int imageRefSize = dx * 2;
+        wxImageList *imglist = new wxImageList(imageRefSize, imageRefSize, true, 1);
+
+        for (int i=0 ; i < COLOR_TABLE_COUNT ; i++){
+          wxScreenDC sdc;
+
+          wxBitmap tbm(imageRefSize, imageRefSize, -1);
+          wxMemoryDC mdc(tbm);
+          mdc.Clear();
+          wxString colorName = colorTableNames[i]; //colorTableNames[state->color_index];
+          wxColour rcolour = wxTheColourDatabase->Find(colorName);
+          if (!rcolour.IsOk())
+            rcolour = wxColour(255,000,255);
+          wxPen dpen( rcolour );
+          wxBrush dbrush( rcolour );
+          mdc.SetPen( dpen );
+          mdc.SetBrush( dbrush );
+
+          int xd = 0;
+          int yd = 0;
+    //    mdc.DrawRoundedRectangle(xd, yd, w+(label_offset * 2), h+2, -.25);
+          mdc.DrawRectangle(xd, yd, imageRefSize, imageRefSize);
+          mdc.SelectObject(wxNullBitmap);
+
+          imglist->Add(tbm);
+        }
+
+        m_pListCtrlTranponders->AssignImageList(imglist, wxIMAGE_LIST_SMALL);
+
+
+
+
+
+
+        wxStaticBoxSizer* sbSizerSim = new wxStaticBoxSizer( new wxStaticBox( this, wxID_ANY, _("Simulator") ), wxVERTICAL );
+        bSizer2->Add( sbSizerSim, 0, wxALL|wxEXPAND, 5 );
+
+        m_simTextCtrl = new wxTextCtrl (this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_READONLY);
+        sbSizerSim->Add( m_simTextCtrl, 0, wxEXPAND | wxALL, 5);
+
+        if (wxFileExists(msgFileName))
+          m_simTextCtrl->SetValue(msgFileName);
+
+        wxBoxSizer *bsizersimButtons = new wxBoxSizer( wxHORIZONTAL );
+        sbSizerSim->Add( bsizersimButtons, 0, wxEXPAND, 5);
+
+        m_ChooseFileButton = new wxButton(this, wxID_ANY, _("Choose File..."),  wxDefaultPosition, wxDefaultSize, 0);
+        bsizersimButtons->Add( m_ChooseFileButton, 0, wxALIGN_LEFT | wxALL, 5);
+        m_ChooseFileButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnChooseFileButton, this);
+
+        m_StopSimButton = new wxButton(this, wxID_ANY, _("Stop Sim"),  wxDefaultPosition, wxDefaultSize, 0);
+        bsizersimButtons->Add( m_StopSimButton, 0, wxALIGN_RIGHT | wxALL, 5);
+        m_StopSimButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnStopSimButton, this);
+
+        m_StartSimButton = new wxButton(this, wxID_ANY, _("StartSim"),  wxDefaultPosition, wxDefaultSize, 0);
+        bsizersimButtons->Add( m_StartSimButton, 0, wxALIGN_RIGHT | wxALL, 5);
+        m_StartSimButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnStartSimButton, this);
+
+        if (pParentPi->m_simulatorTimer.IsRunning()){
+          m_StartSimButton->Hide();
+          m_StopSimButton->Show();
+        }
+        else{
+          m_StopSimButton->Hide();
+          m_StartSimButton->Show();
+        }
+
 
         wxStaticBoxSizer* sbSizerP = new wxStaticBoxSizer( new wxStaticBox( this, wxID_ANY, _("Tender GPS Serial Port") ), wxVERTICAL );
 
@@ -2506,6 +2724,7 @@ TenderPrefsDialog::TenderPrefsDialog( wxWindow* parent, wxWindowID id, const wxS
             m_comboIcon->Append(g_iconTypeArray.Item(i));
         }
 
+#if 0
         // Icon parameters
         wxStaticBoxSizer* sbSizerDimensions = new wxStaticBoxSizer( new wxStaticBox( this, wxID_ANY, _("Tender Dimensions") ), wxVERTICAL );
         bSizer2->Add( sbSizerDimensions, 1, wxALL|wxEXPAND, 5 );
@@ -2530,7 +2749,7 @@ TenderPrefsDialog::TenderPrefsDialog( wxWindow* parent, wxWindowID id, const wxS
         realSizes->Add(new wxStaticText(this, wxID_ANY, _("GPS Offset from Midship (m)")), 1, wxALIGN_LEFT);
         m_pTenderGPSOffsetX = new wxTextCtrl(this, wxID_ANY);
         realSizes->Add(m_pTenderGPSOffsetX, 1, wxALIGN_RIGHT | wxALL, 4);
-
+#endif
 
  /*
         wxString m_rbViewTypeChoices[] = { _("Extended"), _("Variation only") };
@@ -2578,12 +2797,105 @@ TenderPrefsDialog::TenderPrefsDialog( wxWindow* parent, wxWindowID id, const wxS
         this->Centre( wxBOTH );
 }
 
-TenderPrefsDialog::~TenderPrefsDialog()
+RopelessDialog::~RopelessDialog()
 {
         delete m_pSerialArray;
 }
 
-void TenderPrefsDialog::OnTenderPrefsOkClick(wxCommandEvent& event)
+void RopelessDialog::RefreshTransponderList()
+{
+  m_pListCtrlTranponders->DeleteAllItems();
+
+      //  Walk the vector of transponder status
+  for (unsigned int i = 0 ; i < pParentPi->transponderStatus.size() ; i++){
+    transponder_state *state = pParentPi->transponderStatus[i];
+
+    wxListItem item;
+    item.SetId(i);
+    m_pListCtrlTranponders->InsertItem(item);
+
+    item.SetColumn(tlICON);
+    m_pListCtrlTranponders->SetItemImage(item, state->color_index);
+
+
+    item.SetColumn(tlIDENT);
+    wxString sid;
+    sid.Printf("%d", state->ident);
+    item.SetText(sid);
+    m_pListCtrlTranponders->SetItem(item);
+
+    item.SetColumn(tlTIMESTAMP);
+    wxString sts;
+    wxDateTime ts = DaysTowDT(state->timeStamp);
+    ts.MakeUTC();
+    sts = ts.FormatISOCombined(' ');
+    //sts.Printf("%g", state->timeStamp);
+    item.SetText(sts);
+    m_pListCtrlTranponders->SetItem(item);
+
+  }
+#ifdef __WXMSW__
+    m_pListCtrlTranponders->Refresh(false);
+#endif
+
+}
+
+void RopelessDialog::OnChooseFileButton(wxCommandEvent &event)
+{
+    wxString file;
+    int response = PlatformFileSelectorDialog(
+        NULL, &file, _("Select an NMEA text file"), *GetpPrivateApplicationDataLocation(), _T(""), _T("*.*"));
+
+    if (response == wxID_OK) {
+
+      if(::wxFileExists( file)){
+        msgFileName = file;
+        m_simTextCtrl->SetValue(msgFileName);
+      }
+    }
+}
+
+void RopelessDialog::OnStopSimButton(wxCommandEvent &event)
+{
+    SetCanvasContextMenuItemViz(pParentPi->m_start_sim_id, true);
+    SetCanvasContextMenuItemViz(pParentPi->m_stop_sim_id, false);
+
+    m_StopSimButton->Hide();
+    m_StartSimButton->Show();
+
+    pParentPi->stopSim();
+    Layout();
+
+}
+
+void RopelessDialog::OnStartSimButton(wxCommandEvent &event)
+{
+
+   if(::wxFileExists(msgFileName)){
+
+        SetCanvasContextMenuItemViz(pParentPi->m_start_sim_id, false);
+        SetCanvasContextMenuItemViz(pParentPi->m_stop_sim_id, true);
+        m_StartSimButton->Hide();
+        m_StopSimButton->Show();
+        pParentPi->startSim();
+        Layout();
+
+   }
+}
+
+void RopelessDialog::OnClose(wxCloseEvent& event)
+{
+  wxPoint p = GetPosition();
+  pParentPi->m_dialogPosX = p.x;
+  pParentPi->m_dialogPosY = p.y;
+  wxSize s = GetSize();
+  pParentPi->m_dialogSizeWidth = s.x;
+  pParentPi->m_dialogSizeHeight = s.y;
+
+	event.Skip();
+}
+
+void RopelessDialog::OnTenderPrefsOkClick(wxCommandEvent& event)
 {
     m_trackedPointName = m_wpComboPort->GetValue();
 
