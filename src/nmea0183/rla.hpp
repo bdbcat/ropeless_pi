@@ -29,8 +29,8 @@
  *         "It is BSD license, do with it what you will"                   *
  */
 
-#if ! defined( RFA_CLASS_HEADER )
-#define RFA_CLASS_HEADER
+#if ! defined( RLA_CLASS_HEADER )
+#define RLA_CLASS_HEADER
 
 /*
 ** Author: Samuel R. Blackburn
@@ -40,28 +40,21 @@
 ** You can use it any way you like.
 */
 
-class RFA : public RESPONSE
+class RLA : public RESPONSE
 {
 
    public:
 
-      RFA();
-     ~RFA();
+      RLA();
+     ~RLA();
 
       /*
       ** Data
       */
 
-      LATLONG          OwnshipPosition;
-      double           OwnshipHeading;
-
-      double           TimeStamp;
 
       int              TransponderCode;
-      int              TransponderPartner;
-      LATLONG          TransponderPosition;
-      double           TransponderRange;
-      double           TransponderBearing;
+      int              TransponderStatus;
 
       /*
       ** Methods
@@ -75,7 +68,7 @@ class RFA : public RESPONSE
       ** Operators
       */
 
-      virtual const RFA& operator = ( const RFA& source );
+      virtual const RLA& operator = ( const RLA& source );
 };
 
-#endif // RMC_CLASS_HEADER
+#endif // RLA_CLASS_HEADER

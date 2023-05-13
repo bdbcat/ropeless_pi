@@ -94,15 +94,31 @@ bool RFA::Parse( const SENTENCE& sentence )
    **  3) Vessel Longitude
    **  4) Vessel Heading
    **  5) Transponder Code
-   **  6) Transponder Code, partner A
-   **  7) Transponder Code, partner B
-   **  8) Range In meters to Transponder
-   **  9) Bearing to Transponder
-   ** 10) Predicted Transponder location Lat
-   ** 11) Predicted Transponder location Lon
-   ** 12) Checksum
+   **  6) Transponder Code, trawl partner
+   **  7) Range In meters to Transponder
+   **  8) Bearing to Transponder
+   **  9) Predicted Transponder location Lat
+   ** 10) Predicted Transponder location Lon
+   ** 11) Checksum
    */
 
+#if 0
+   Followed the bellow format.
+% $--RFA,xxxm.yyy,llll.ll,llll.ll,xxx,cccc,cccc,cccc,xxxx.xx,xxx.xx,llll.ll,llll.ll*hh<CR><LF>
+%  Field Number:
+%  1) Timestamp
+%  2) Vessel Latitude
+%  3) Vessel Longitude
+%  4) Vessel Heading
+%  5) Transponder Code
+%  6) Transponder Trawl Pair Code
+%  7) Range In meters to Transponder
+%  8) Bearing to Transponder
+%  9) Predicted Transponder location Lat
+%  10) Predicted Transponder location Lon
+%  11) Checksum
+
+#endif
    /*
    ** First we check the checksum...
    */
@@ -120,10 +136,11 @@ bool RFA::Parse( const SENTENCE& sentence )
    OwnshipHeading = sentence.Double(4);
    TimeStamp = sentence.Double(1);
 
-   TransponderPosition.Parse(8, 9, sentence);
+   TransponderPosition.Parse(9, 10, sentence);
    TransponderCode = sentence.Integer(5);
-   TransponderRange = sentence.Double(6);
-   TransponderBearing = sentence.Double(7);
+   TransponderPartner = sentence.Integer(6);
+   TransponderRange = sentence.Double(7);
+   TransponderBearing = sentence.Double(8);
 
 
    return( TRUE );

@@ -30,6 +30,7 @@
 #include <typeinfo>
 #include <wx/graphics.h>
 
+#include "config.h"
 #include "ropeless_pi.h"
 #include "icons.h"
 #include "Select.h"
@@ -40,6 +41,9 @@
 #include "georef.h"
 #include "OCPNListCtrl.h"
 #include "pugixml.hpp"
+
+#include <arpa/inet.h>
+#include <netinet/tcp.h>
 
 #ifdef ocpnUSE_GL
 #include <GL/gl.h>
@@ -79,12 +83,9 @@ wxArrayString           g_iconTypeArray;
 int                     gHDT_Watchdog;
 int                     gGPS_Watchdog;
 
-static int s_ownship_icon[] = { 5, -42, 11, -28, 11, 42, -11, 42, -11, -28, -5, -42, -11, 0, 11, 0,
-0, 42, 0, -42
-};
+ropeless_pi             *g_ropelessPI;
 
 #include <wx/arrimpl.cpp> // this is a magic incantation which must be done!
-WX_DEFINE_OBJARRAY(ArrayOfBrgLines);
 WX_DEFINE_OBJARRAY(ArrayOf2DPoints);
 
 #include "default_pi.xpm"
@@ -98,7 +99,7 @@ wxString colorTableNames[] = {
 };
 #define COLOR_TABLE_COUNT 5
 
-wxString msgFileName = "/home/dsr/Projects/ropeless_pi/testset1.txt";
+wxString msgFileName = "/home/dsr/RFA01132022.txt"; //"/home/dsr/Projects/ropeless_pi/testset1.txt";
 
 wxDateTime DaysTowDT( double days )
 {
@@ -219,9 +220,7 @@ END_EVENT_TABLE()
 ropeless_pi::ropeless_pi( void *ppimgr ) :
         wxTimer( this ), opencpn_plugin_112( ppimgr )
 {
-    // Create the PlugIn icons
-//    initialize_images();
-
+    g_ropelessPI = this;
     m_pplugin_icon = new wxBitmap(default_pi);
 
 }
@@ -291,9 +290,9 @@ int ropeless_pi::Init( void )
     //    And load the configuration items
     LoadConfig();
 
-    m_pTrackRolloverWin = new RolloverWin( GetOCPNCanvasWindow() );
-    m_pTrackRolloverWin->SetPosition( wxPoint( 5, 150 ) );
-    m_pTrackRolloverWin->IsActive( false );
+//     m_pTrackRolloverWin = new RolloverWin( GetOCPNCanvasWindow() );
+//     m_pTrackRolloverWin->SetPosition( wxPoint( 5, 150 ) );
+//     m_pTrackRolloverWin->IsActive( false );
 
 //     m_pTrackRolloverWin->SetString( _T("Brg:   0\nDist:   0") );
 //     m_pTrackRolloverWin->SetBestSize();
@@ -306,6 +305,10 @@ int ropeless_pi::Init( void )
     SetOwner(this, TIMER_THIS_PI);
     Start( 1000, wxTIMER_CONTINUOUS );
 
+    m_event_handler = new PI_EventHandler(this);
+    m_tsock = NULL;
+
+#if 0
 #ifndef __WXMSW__
     wxEVT_PI_OCPN_DATASTREAM = wxNewEventType();
 #endif
@@ -317,8 +320,6 @@ int ropeless_pi::Init( void )
 
     m_RolloverPopupTimer.SetOwner( m_event_handler, ROLLOVER_TIMER );
     m_rollover_popup_timer_msec = 20;
-    m_pBrgRolloverWin = NULL;
-    m_pRolloverBrg = NULL;
 
     m_select = new Select();
     m_tenderSelect = NULL;
@@ -327,35 +328,16 @@ int ropeless_pi::Init( void )
     m_head_active = false;
 
     setTrackedWPSelect(m_trackedWPGUID);
+#endif
+    m_select = new Select();
 
     initialize_images();
     m_pRLDialog = NULL;
 
 
-    ///  Testing
-#if 0
-    brg_line *brg = new brg_line(350, TRUE_BRG, 42.033, -70.183, 2.);
-    m_brg_array.Add(brg);
-    m_select->AddSelectablePoint( brg->GetLatA(), brg->GetLonA(), brg, SELTYPE_POINT_GENERIC, SEL_POINT_A );
-    m_select->AddSelectablePoint( brg->GetLatB(), brg->GetLonB(), brg, SELTYPE_POINT_GENERIC, SEL_POINT_B );
-    m_select->AddSelectableSegment( brg->GetLatA(), brg->GetLonA(), brg->GetLatB(), brg->GetLonB(), brg, SEL_SEG );
-
-    brg = new brg_line(120, TRUE_BRG, 42.033, -70.183, 2.);
-    m_brg_array.Add(brg);
-    m_select->AddSelectablePoint( brg->GetLatA(), brg->GetLonA(), brg, SELTYPE_POINT_GENERIC, SEL_POINT_A );
-    m_select->AddSelectablePoint( brg->GetLatB(), brg->GetLonB(), brg, SELTYPE_POINT_GENERIC, SEL_POINT_B );
-    m_select->AddSelectableSegment( brg->GetLatA(), brg->GetLonA(), brg->GetLatB(), brg->GetLonB(), brg, SEL_SEG );
-
-    brg = new brg_line(200, TRUE_BRG, 42.033, -70.183, 2.);
-    m_brg_array.Add(brg);
-    m_select->AddSelectablePoint( brg->GetLatA(), brg->GetLonA(), brg, SELTYPE_POINT_GENERIC, SEL_POINT_A );
-    m_select->AddSelectablePoint( brg->GetLatB(), brg->GetLonB(), brg, SELTYPE_POINT_GENERIC, SEL_POINT_B );
-    m_select->AddSelectableSegment( brg->GetLatA(), brg->GetLonA(), brg->GetLatB(), brg->GetLonB(), brg, SEL_SEG );
-#endif
+    m_colorIndexNext = 0;
 
     LoadTransponderStatus();    //Load persistant XML file
-
-    m_colorIndexNext = 0;
 
     wxMenuItem *sim_item = new wxMenuItem(NULL, ID_PLAY_SIM, _("Start Ropeless Simulation") );
     m_start_sim_id = AddCanvasContextMenuItem(sim_item, this );
@@ -393,9 +375,7 @@ bool ropeless_pi::DeInit( void )
     if( IsRunning() ) // Timer started?
         Stop(); // Stop timer
 
-    stopSerial();
-
-    delete m_event_handler;             // also diconnects serial events
+//    delete m_event_handler;             // also diconnects serial events
 
 //     int tsec = 2;
 //     while(tsec--)
@@ -576,6 +556,23 @@ void ropeless_pi::PopupMenuHandler( wxCommandEvent& event )
             break;
         }
 
+        case ID_TPR_RELEASE:
+        {
+          wxString msg("Send Release command to transponder IDENT: \n\n");
+          wxString msg1;
+          msg1.Printf("%d\n\n", m_foundState->ident);
+          msg += msg1;
+          int ret = OCPNMessageBox_PlugIn(NULL, msg, _("ropeless_pi Message"), wxYES_NO);
+
+          if(ret == wxID_YES){
+            SendReleaseMessage(m_foundState);
+          }
+
+          handled = true;
+          break;
+        }
+
+
         default:
             break;
     }
@@ -584,141 +581,7 @@ void ropeless_pi::PopupMenuHandler( wxCommandEvent& event )
         event.Skip();
 }
 
-bool ropeless_pi::MouseEventHook( wxMouseEvent &event )
-{
-    bool bret = false;
 #if 0
-    m_mouse_x = event.m_x;
-    m_mouse_y = event.m_y;
-
-    //  Retrigger the rollover timer
-    if( m_pBrgRolloverWin && m_pBrgRolloverWin->IsActive() )
-        m_RolloverPopupTimer.Start( 10, wxTIMER_ONE_SHOT );               // faster response while the rollover is turned on
-    else
-        m_RolloverPopupTimer.Start( m_rollover_popup_timer_msec, wxTIMER_ONE_SHOT );
-
-    wxPoint mp(event.m_x, event.m_y);
-    GetCanvasLLPix( &g_ovp, mp, &m_cursor_lat, &m_cursor_lon);
-
-    //  On button push, find any bearing line selecteable, and other useful data
-    if( event.RightDown() || event.LeftDown()) {
-        m_sel_brg = NULL;
-
-        m_pFind = m_select->FindSelection( m_cursor_lat, m_cursor_lon, SELTYPE_POINT_GENERIC );
-
-        if(m_pFind){
-            for(unsigned int i=0 ; i < m_brg_array.GetCount() ; i++){
-                brg_line *pb = m_brg_array.Item(i);
-
-                if(m_pFind->m_pData1 == pb){
-                    m_sel_brg = pb;
-                    m_sel_part = m_pFind->GetUserData();
-                    if(SEL_POINT_A == m_sel_part){
-                        m_sel_pt_lat = pb->GetLatA();
-                        m_sel_pt_lon = pb->GetLonA();
-                    }
-                    else {
-                        m_sel_pt_lat = pb->GetLatB();
-                        m_sel_pt_lon = pb->GetLonB();
-                    }
-
-                    break;
-                }
-            }
-        }
-        else{
-            m_pFind = m_select->FindSelection( m_cursor_lat, m_cursor_lon, SELTYPE_SEG_GENERIC );
-
-            if(m_pFind){
-                for(unsigned int i=0 ; i < m_brg_array.GetCount() ; i++){
-                    brg_line *pb = m_brg_array.Item(i);
-
-                    if(m_pFind->m_pData1 == pb){
-                        m_sel_brg = pb;
-                        m_sel_part = m_pFind->GetUserData();
-
-                        //  Get the mercator offsets from the cursor point to the brg "A" point
-                        toSM_Plugin(m_cursor_lat, m_cursor_lon, pb->GetLatA(), pb->GetLonA(),
-                                    &m_segdrag_ref_x, &m_segdrag_ref_y);
-                        m_sel_pt_lat = m_cursor_lat;
-                        m_sel_pt_lon = m_cursor_lon;
-
-                    }
-                }
-            }
-        }
-    }
-
-#endif
-
-    if( event.RightDown() ) {
-        //wxMenu* contextMenu = new wxMenu;
-        //wxMenuItem *sim_item = new wxMenuItem(contextMenu, ID_PLAY_SIM, _("Start Simulation") );
-        //contextMenu->Append(sim_item);
-        //GetOCPNCanvasWindow()->Connect( ID_PLAY_SIM, wxEVT_COMMAND_MENU_SELECTED,
-        //                                        wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, this );
-
-#if 0
-        if( m_sel_brg || m_bshow_fix_hat){
-
-            wxMenu* contextMenu = new wxMenu;
-
-            wxMenuItem *brg_item = 0;
-            wxMenuItem *fix_item = 0;
-
-            if(!m_bshow_fix_hat && m_sel_brg){
-                brg_item = new wxMenuItem(contextMenu, ID_EPL_DELETE, _("Delete Bearing") );
-                contextMenu->Append(brg_item);
-                GetOCPNCanvasWindow()->Connect( ID_EPL_DELETE, wxEVT_COMMAND_MENU_SELECTED,
-                                                wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, this );
-            }
-
-            if(m_bshow_fix_hat){
-                wxMenuItem *fix_item = new wxMenuItem(contextMenu, ID_EPL_XMIT, _("Send sighted fix to device") );
-                contextMenu->Append(fix_item);
-                GetOCPNCanvasWindow()->Connect( ID_EPL_XMIT, wxEVT_COMMAND_MENU_SELECTED,
-                                                wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, this );
-            }
-
-            //   Invoke the drop-down menu
-            GetOCPNCanvasWindow()->PopupMenu( contextMenu, m_mouse_x, m_mouse_y );
-
-            if(brg_item){
-                GetOCPNCanvasWindow()->Disconnect( ID_EPL_DELETE, wxEVT_COMMAND_MENU_SELECTED,
-                                                   wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, this );
-            }
-
-            if(fix_item){
-                GetOCPNCanvasWindow()->Connect( ID_EPL_XMIT, wxEVT_COMMAND_MENU_SELECTED,
-                                                wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, this );
-            }
-
-            bret = true;                // I have eaten this event
-        }
-#endif
-    }
-
-    else if( event.LeftDown() ) {
-    }
-
-    else if(event.Dragging()){
-    }
-
-    if( event.LeftUp() ) {
-#if 0
-        if(m_sel_brg)
-            bret = true;
-
-        m_pFind = NULL;
-        m_sel_brg = NULL;
-
-        m_nfix = CalculateFix();
-#endif
-    }
-    return bret;
-}
-
-
 void ropeless_pi::setTrackedWPSelect(wxString GUID)
 {
     if(GUID.Length()){
@@ -743,6 +606,75 @@ void ropeless_pi::setTrackedWPSelect(wxString GUID)
         }
     }
 }
+#endif
+
+unsigned char ropeless_pi::ComputeChecksum( wxString msg )
+{
+   unsigned char checksum_value = 0;
+
+   char str_ascii[101];
+   strncpy(str_ascii, (const char *)msg.mb_str(), 99);
+   str_ascii[100] = '\0';
+
+   int string_length = strlen(str_ascii);
+   int index = 1; // Skip over the $ at the begining of the sentence
+
+   while( index < string_length    &&
+          str_ascii[ index ] != '*' &&
+          str_ascii[ index ] != CARRIAGE_RETURN &&
+          str_ascii[ index ] != LINE_FEED )
+   {
+         checksum_value ^= str_ascii[ index ];
+         index++;
+   }
+
+   return( checksum_value );
+}
+
+
+bool ropeless_pi::SendReleaseMessage(transponder_state *state)
+{
+  bool ret = true;
+
+  // Create payload
+  wxString payload("$RSRLB,");
+  wxString pl1;
+  pl1.Printf("%d,0*", state->ident);
+  payload += pl1;
+  unsigned char cs = ComputeChecksum(payload);
+  pl1.Printf("%02X", cs);
+  payload += pl1;
+
+  // Create a UDP transmit socket
+  if( !m_tsock ){
+    m_tconn_addr.Service(59647);
+    // m_tconn_addr.Hostname("192.168.37.255");  //OK
+    m_tconn_addr.Hostname("255.255.255.255");  //OK
+    //m_tconn_addr.AnyAddress();      // NOPE, produces "0.0.0.0" for address, i.e. for listening
+    wxString a = m_tconn_addr.IPAddress();
+    m_tsock =  new wxDatagramSocket(m_tconn_addr, wxSOCKET_NOWAIT | wxSOCKET_REUSEADDR);
+
+     int broadcastEnable = 1;
+       m_tsock->SetOption(
+           SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable));
+
+  }
+
+  wxDatagramSocket* udp_socket;
+  udp_socket = dynamic_cast<wxDatagramSocket*>(m_tsock);
+  if (udp_socket && udp_socket->IsOk()) {
+     udp_socket->SendTo(m_tconn_addr, payload.mb_str(), payload.size());
+     if (udp_socket->Error()){
+       //wxSocketError err = udp_socket->LastError();
+       ret = false;
+     }
+  }
+  else
+    ret = false;
+
+  return ret;
+}
+
 
 int n_tick;
 double countRun;
@@ -764,7 +696,7 @@ void ropeless_pi::startSim()
 
   countRun = 0;
   countTarget = 5;
-  accelFactor = 20;
+  accelFactor = 40;
 
   m_simulatorTimer.SetOwner( this, SIM_TIMER );
   m_simulatorTimer.Start(100, wxTIMER_CONTINUOUS);
@@ -808,8 +740,10 @@ void ropeless_pi::ProcessSimTimerEvent( wxTimerEvent& event )
         if( m_NMEA0183.Parse() ){
           tstamp_current = m_NMEA0183.Rfa.TimeStamp;
 
-          if(inext > 1)
-            countTarget = (tstamp_current - tstamp_last) * 3600 * 24;
+          if(inext > 1){
+            //countTarget = (tstamp_current - tstamp_last) * 3600 * 24;   First data set, time stamp in julian days
+            countTarget = (tstamp_current - tstamp_last);   //Second data set, time stamp is in seconds
+          }
           countRun = 0;
         }
       }
@@ -827,47 +761,6 @@ void ropeless_pi::ProcessSimTimerEvent( wxTimerEvent& event )
 
 void ropeless_pi::ProcessTimerEvent( wxTimerEvent& event )
 {
-#if 0
-    if(event.GetId() == ROLLOVER_TIMER)
-        OnRolloverPopupTimerEvent( event );
-    else if(event.GetId() == HEAD_DOG_TIMER)    // no hdt source available
-        m_head_active = false;
-
-    else{
-        if(gGPS_Watchdog++ > 5)
-            pos_valid = false;
-
-        //  Every tick, get a fresh copy of the tracked waypoint, in case it got moved.
-        GetSingleWaypoint( m_trackedWPGUID, &m_TrackedWP );
-
-        //  Update the continuos tracking popup
-        double brg, dist;
-        DistanceBearingMercator(  m_TrackedWP.m_lat, m_TrackedWP.m_lon, gLat, gLon, &brg, &dist );
-
-        if(dist < 1.0){
-            wxString s;
-            s << wxString::Format( wxString("Tracked Bearing:  %03d°  \n", wxConvUTF8 ), (int)brg  );
-
-            if(dist > 0.5)
-                s << wxString::Format( wxString("Tracked Distance: %2.1f NMi  ", wxConvUTF8 ), dist  );
-            else
-                s << wxString::Format( wxString("Tracked Distance: %4d Ft.  ", wxConvUTF8 ), (int)(dist * 6076.0)  );
-
-            m_pTrackRolloverWin->SetString( s );
-            m_pTrackRolloverWin->SetBestSize();
-            m_pTrackRolloverWin->SetBitmap( 0 );
-            m_pTrackRolloverWin->SetPosition( wxPoint( 5, 150 ) );
-
-            m_pTrackRolloverWin->IsActive( true );
-        }
-        else
-            m_pTrackRolloverWin->IsActive( false );
-
-
-        m_select->DeleteSelectablePoint( this, SELTYPE_POINT_GENERIC, SELTYPE_ROUTEPOINT );
-        m_select->AddSelectablePoint( m_TrackedWP.m_lat, m_TrackedWP.m_lon, this, SELTYPE_ROUTEPOINT, 0 );
-    }
-#endif
 
     // Age the transponder history records
     for (unsigned int i = 0 ; i < transponderStatus.size() ; i++){
@@ -893,6 +786,10 @@ void ropeless_pi::populateTransponderNode(pugi::xml_node &transponderNode,
   child = transponderNode.append_child("ident");
   wxString ss;
   ss.Printf("%d", state->ident);
+  child.append_child(pugi::node_pcdata).set_value(ss.c_str());
+
+  child = transponderNode.append_child("identPartner");
+  ss.Printf("%d", state->ident_partner);
   child.append_child(pugi::node_pcdata).set_value(ss.c_str());
 
   child = transponderNode.append_child("timeStamp");
@@ -948,6 +845,9 @@ bool ropeless_pi::parseTransponderNode(pugi::xml_node &transponderNode, transpon
           if (!strcmp(child.name(), "ident")) {
             state->ident = atoi(child.first_child().value());
           }
+          if (!strcmp(child.name(), "identPartner")) {
+            state->ident_partner = atoi(child.first_child().value());
+          }
           if (!strcmp(child.name(), "timeStamp")) {
             wxString val(child.first_child().value());
             double dval;
@@ -979,6 +879,9 @@ void ropeless_pi::LoadTransponderStatus()
     wxString fileName = *GetpPrivateApplicationDataLocation() +
                            wxFileName::GetPathSeparator() +
                            _T("ropeless-transponders.xml");
+
+    if (!wxFileExists(fileName))
+      return;
 
     bool ret = transponderStatusXML.load_file(fileName.mb_str());
     if (ret) {
@@ -1012,403 +915,8 @@ void ropeless_pi::LoadTransponderStatus()
     }
 }
 
-void ropeless_pi::OnRolloverPopupTimerEvent( wxTimerEvent& event )
-{
-    bool b_need_refresh = false;
 
-    bool showRollover = false;
 
-
-
-    if( (NULL == m_pRolloverBrg) ) {
-
-        m_pFind = m_select->FindSelection( m_cursor_lat, m_cursor_lon, SELTYPE_ROUTEPOINT );
-
-        if(m_pFind){
-//             for(unsigned int i=0 ; i < m_brg_array.GetCount() ; i++){
-//                 brg_line *pb = m_brg_array.Item(i);
-//
-//                 if(m_pFind->m_pData1 == pb){
-//                     m_pRolloverBrg = pb;
-//                     break;
-//                 }
-//             }
-//         }
-//
-//         if( m_pRolloverBrg )
-//         {
-                showRollover = true;
-
-                if( NULL == m_pBrgRolloverWin ) {
-                    m_pBrgRolloverWin = new RolloverWin( GetOCPNCanvasWindow() );
-                    m_pBrgRolloverWin->IsActive( false );
-                }
-
-                if( !m_pBrgRolloverWin->IsActive() ) {
-                    wxString s;
-
-//                    s = _T("Test Rollover");
-
-                    double brg, dist;
-                    DistanceBearingMercator(  m_TrackedWP.m_lat, m_TrackedWP.m_lon, gLat, gLon, &brg, &dist );
-
-                    s << wxString::Format( wxString("Tracked Bearing:  %03d°  \n", wxConvUTF8 ), (int)brg  );
-
-                    if(dist > 0.5)
-                        s << wxString::Format( wxString("Tracked Distance: %2.1f NMi  ", wxConvUTF8 ), dist  );
-                    else
-                        s << wxString::Format( wxString("Tracked Distance: %4d Ft.  ", wxConvUTF8 ), (int)(dist * 6076.0)  );
-
-
-                    m_pBrgRolloverWin->SetString( s );
-
-                    m_pBrgRolloverWin->SetBestPosition( m_mouse_x, m_mouse_y, 16, 16, 0, wxSize(100, 100));
-                    m_pBrgRolloverWin->SetBitmap( 0 );
-                    m_pBrgRolloverWin->IsActive( true );
-                    b_need_refresh = true;
-                    showRollover = true;
-                }
-            }
-
-    } else {
-        //    Is the cursor still in select radius?
-        if( !m_select->IsSelectableSegmentSelected( m_cursor_lat, m_cursor_lon, m_pFind ) )
-            showRollover = false;
-        else
-            showRollover = true;
-    }
-
-
-
-    if( m_pBrgRolloverWin && m_pBrgRolloverWin->IsActive() && !showRollover ) {
-        m_pBrgRolloverWin->IsActive( false );
-        m_pRolloverBrg = NULL;
-        m_pBrgRolloverWin->Destroy();
-        m_pBrgRolloverWin = NULL;
-        b_need_refresh = true;
-    } else if( m_pBrgRolloverWin && showRollover ) {
-        m_pBrgRolloverWin->IsActive( true );
-        b_need_refresh = true;
-    }
-
-    if( b_need_refresh )
-        GetOCPNCanvasWindow()->Refresh(true);
-
-}
-
-void ropeless_pi::setIcon( char ** xpm_bits)
-{
-    m_tender_bmp = wxBitmap(xpm_bits);
-    wxMask *mask = new wxMask(m_tender_bmp, wxColour(0,0,0));
-    m_tender_bmp.SetMask(mask);
-
-    m_iconTexture = 0;
-}
-
-void ropeless_pi::ComputeShipScaleFactor(float icon_hdt,
-                                         int ownShipWidth, int ownShipLength,
-                                         wxPoint &lShipMidPoint,
-                                         wxPoint &GPSOffsetPixels, wxPoint lGPSPoint,
-                                         float &scale_factor_x, float &scale_factor_y)
-{
-    float screenResolution = (float) ::wxGetDisplaySize().x / ::wxGetDisplaySizeMM().x ;
-
-    //  Calculate the true ship length in exact pixels
-    double ship_bow_lat, ship_bow_lon;
-    ll_gc_ll( gLat, gLon, icon_hdt, m_tenderLength / 1852., &ship_bow_lat, &ship_bow_lon );
-    wxPoint lShipBowPoint;
-    wxPoint b_point;
-    GetCanvasPixLL(g_vp, &b_point, ship_bow_lat, ship_bow_lon);
-    wxPoint a_point;
-    GetCanvasPixLL(g_vp, &a_point, gLat, gLon);
-
-    float shipLength_px = sqrtf( powf( (float) (b_point.x - a_point.x), 2) +
-    powf( (float) (b_point.y - a_point.y), 2) );
-
-    //  And in mm
-    float shipLength_mm = shipLength_px / screenResolution;
-
-    //  Set minimum ownship drawing size
-    float ownship_min_mm = 6;
-    ownship_min_mm = wxMax(ownship_min_mm, 1.0);
-
-    //  Calculate Nautical Miles distance from midships to gps antenna
-    float hdt_ant = icon_hdt + 180.;
-    float dy = ( m_tenderLength / 2 - m_tenderGPS_y ) / 1852.;
-    float dx = m_tenderGPS_x / 1852.;
-    if( m_tenderGPS_y > m_tenderLength / 2 )      //reverse?
-    {
-        hdt_ant = icon_hdt;
-        dy = -dy;
-    }
-
-    //  If the drawn ship size is going to be clamped, adjust the gps antenna offsets
-    if( shipLength_mm < ownship_min_mm ) {
-        dy /= shipLength_mm / ownship_min_mm;
-        dx /= shipLength_mm / ownship_min_mm;
-    }
-
-    double ship_mid_lat, ship_mid_lon, ship_mid_lat1, ship_mid_lon1;
-
-    ll_gc_ll( gLat, gLon, hdt_ant, dy, &ship_mid_lat, &ship_mid_lon );
-    ll_gc_ll( ship_mid_lat, ship_mid_lon, icon_hdt - 90., dx, &ship_mid_lat1, &ship_mid_lon1 );
-
-    GetCanvasPixLL(g_vp, &lShipMidPoint, ship_mid_lat1, ship_mid_lon1);
-    GPSOffsetPixels.x = lShipMidPoint.x - lGPSPoint.x;
-    GPSOffsetPixels.y = lShipMidPoint.y - lGPSPoint.y;
-
-    float scale_factor = shipLength_px / ownShipLength;
-
-    //  Calculate a scale factor that would produce a reasonably sized icon
-    float scale_factor_min = ownship_min_mm / ( ownShipLength / screenResolution );
-
-    //  And choose the correct one
-    scale_factor = wxMax(scale_factor, scale_factor_min);
-
-    scale_factor_y = scale_factor;
-    scale_factor_x = scale_factor_y * ( (float) ownShipLength / ownShipWidth )
-    / ( (float) m_tenderLength / m_tenderWidth );
-}
-
-
-void ropeless_pi::RenderIconDC(wxDC &dc )
-{
-    wxPoint ab;
-    GetCanvasPixLL(g_vp, &ab, gLat, gLon);
-
-    //  Draw the icon rotated to the COG
-    //  or to the Hdt if available
-    float icon_hdt = gCog;
-
-    if( wxIsNaN( gHdt ) ){
-        if(!wxIsNaN(gHdm) && !wxIsNaN(gVar)){
-            icon_hdt = gHdm + gVar;
-        }
-    }
-    else
-        icon_hdt = gHdt;
-
-    //  COG may be undefined in NMEA data stream
-    if( wxIsNaN(icon_hdt) ) icon_hdt = 0.0;
-
-    //    Calculate the ownship drawing angle icon_rad using an assumed 10 minute predictor
-    double osd_head_lat, osd_head_lon;
-    wxPoint osd_head_point;
-
-    ll_gc_ll( gLat, gLon, icon_hdt, gSog * 10. / 60., &osd_head_lat, &osd_head_lon );
-
-    wxPoint lShipMidPoint;
-    GetCanvasPixLL(g_vp, &lShipMidPoint, gLat, gLon);
-    GetCanvasPixLL(g_vp, &osd_head_point, osd_head_lat, osd_head_lon);
-
-
-    float icon_rad = atan2f( (float) ( osd_head_point.y - lShipMidPoint.y ),
-                             (float) ( osd_head_point.x - lShipMidPoint.x ) );
-    icon_rad += (float)PI;
-    double rotate = g_vp->rotation;
-
-    if (gSog < 0.2) icon_rad = ((icon_hdt + 90.) * PI / 180) + rotate;
-
-
-    float scale_factor_x, scale_factor_y;
-    int ownShipWidth = 22; // Default values from s_ownship_icon
-    int ownShipLength= 84;
-    wxPoint lGPSPoint,  lPredPoint, lHeadPoint, GPSOffsetPixels(0,0);
-
-    GetCanvasPixLL(g_vp, &lGPSPoint, gLat, gLon);
-
-    ComputeShipScaleFactor(icon_hdt, ownShipWidth, ownShipLength,
-                           lShipMidPoint, GPSOffsetPixels, lGPSPoint, scale_factor_x, scale_factor_y);
-
-    if(m_tenderIconType.IsSameAs(_T("Generic Ship Icon")))
-        dc.DrawBitmap(m_tender_bmp, ab.x, ab.y, true);
-    else{
-
-        wxPoint ownship_icon[10];
-
-        for( int i = 0; i < 10; i++ ) {
-            int j = i * 2;
-            float pxa = (float) ( s_ownship_icon[j] );
-            float pya = (float) ( s_ownship_icon[j + 1] );
-            pya *= scale_factor_y;
-            pxa *= scale_factor_x;
-
-            float px = ( pxa * sinf( icon_rad ) ) + ( pya * cosf( icon_rad ) );
-            float py = ( pya * sinf( icon_rad ) ) - ( pxa * cosf( icon_rad ) );
-
-            ownship_icon[i].x = (int) ( px ) + lShipMidPoint.x;
-            ownship_icon[i].y = (int) ( py ) + lShipMidPoint.y;
-        }
-
-        wxColour pcol;
-        GetGlobalColor( _T ( "UBLCK" ), &pcol);
-        wxPen ppPen1( pcol, 1, wxPENSTYLE_SOLID );
-        dc.SetPen( ppPen1 );
-
-        wxColour tenderColor;
-        GetGlobalColor( _T ( "UGREN" ), &tenderColor);
-        if(pos_valid){
-             dc.SetBrush( wxBrush( tenderColor ) );
-        }
-        else
-            dc.SetBrush( *wxTRANSPARENT_BRUSH );
-
-
-
-        dc.DrawPolygon( 6, &ownship_icon[0], 0, 0 );
-
-        dc.DrawLine( ownship_icon[6].x, ownship_icon[6].y, ownship_icon[7].x, ownship_icon[7].y );
-        dc.DrawLine( ownship_icon[8].x, ownship_icon[8].y, ownship_icon[9].x, ownship_icon[9].y );
-
-        //      Reference point, where the GPS antenna is
-        int circle_rad = 3;
-
-        dc.SetPen( wxPen( pcol, 1 ) );
-        dc.SetBrush( wxBrush( pcol ) );
-        dc.DrawCircle( lGPSPoint.x, lGPSPoint.y, circle_rad );
-
-//         dc.StrokePolygon( 6, &ownship_icon[0], 0, 0 );
-//
-//         //     draw reference point (midships) cross
-//         dc.StrokeLine( ownship_icon[6].x, ownship_icon[6].y, ownship_icon[7].x,
-//                        ownship_icon[7].y );
-//         dc.StrokeLine( ownship_icon[8].x, ownship_icon[8].y, ownship_icon[9].x,
-//                       ownship_icon[9].y );
-    }
-
-
-}
-
-void ropeless_pi::RenderIconGL( )
-{
-#if 0
-       wxPoint ab;
-    GetCanvasPixLL(g_vp, &ab, gLat, gLon);
-
-    //  Draw the icon rotated to the COG
-    //  or to the Hdt if available
-    float icon_hdt = gCog;
-
-    if( wxIsNaN( gHdt ) ){
-        if(!wxIsNaN(gHdm) && !wxIsNaN(gVar)){
-            icon_hdt = gHdm + gVar;
-        }
-    }
-    else
-        icon_hdt = gHdt;
-
-    //  COG may be undefined in NMEA data stream
-    if( wxIsNaN(icon_hdt) ) icon_hdt = 0.0;
-
-    //    Calculate the ownship drawing angle icon_rad using an assumed 10 minute predictor
-    double osd_head_lat, osd_head_lon;
-    wxPoint osd_head_point;
-
-    ll_gc_ll( gLat, gLon, icon_hdt, gSog * 10. / 60., &osd_head_lat, &osd_head_lon );
-
-    wxPoint lShipMidPoint;
-    GetCanvasPixLL(g_vp, &lShipMidPoint, gLat, gLon);
-    GetCanvasPixLL(g_vp, &osd_head_point, osd_head_lat, osd_head_lon);
-
-
-    float icon_rad = atan2f( (float) ( osd_head_point.y - lShipMidPoint.y ),
-                             (float) ( osd_head_point.x - lShipMidPoint.x ) );
-    icon_rad += (float)PI;
-    double rotate = g_vp->rotation;
-
-    if (gSog < 0.2) icon_rad = ((icon_hdt + 90.) * PI / 180) + rotate;
-
-
-    float scale_factor_x, scale_factor_y;
-    int ownShipWidth = 22; // Default values from s_ownship_icon
-    int ownShipLength= 84;
-    wxPoint lGPSPoint,  lPredPoint, lHeadPoint, GPSOffsetPixels(0,0);
-
-    GetCanvasPixLL(g_vp, &lGPSPoint, gLat, gLon);
-
-    ComputeShipScaleFactor(icon_hdt, ownShipWidth, ownShipLength,
-                           lShipMidPoint, GPSOffsetPixels, lGPSPoint, scale_factor_x, scale_factor_y);
-
-    if(m_tenderIconType.IsSameAs(_T("Generic Ship Icon"))){
-        if(m_iconTexture == 0){
-            m_iconTexture = GetIconTexture( &m_tender_bmp, m_texwidth, m_texheight );
-        }
-
-        wxPoint ab;
-        GetCanvasPixLL(g_vp, &ab, gLat, gLon);
-
-        renderTexture( m_iconTexture, ab, m_texwidth, m_texheight );
-
-    }
-    else{
-
-        glEnable(GL_BLEND);
-
-        glEnableClientState(GL_VERTEX_ARRAY);
-
-        int x = lShipMidPoint.x, y = lShipMidPoint.y;
-        glPushMatrix();
-        glTranslatef(x, y, 0);
-
-        float deg = 180/PI * ( icon_rad - PI/2 );
-        glRotatef(deg, 0, 0, 1);
-
-        glScalef(scale_factor_x, scale_factor_y, 1);
-
-        { // Scaled Vector
-
-            static const GLint s_ownship_icon[] = { 5, -42, 11, -28, 11, 42, -11, 42,
-            -11, -28, -5, -42, -11, 0, 11, 0,
-            0, 42, 0, -42       };
-
-            glColor4ub(0, 255, 0, 255);
-
-            glVertexPointer(2, GL_INT, 2*sizeof(GLint), s_ownship_icon);
-
-            if(pos_valid)
-                glDrawArrays(GL_POLYGON, 0, 6);
-
-            glColor4ub(0, 0, 0, 255);
-            glLineWidth(2);
-
-            glDrawArrays(GL_LINE_LOOP, 0, 6);
-            glDrawArrays(GL_LINES, 6, 4);
-        }
-        glPopMatrix();
-
-
-        //      Reference point, where the GPS antenna is
-        int circle_rad = 3;
-
-        float cx = lGPSPoint.x, cy = lGPSPoint.y;
-        // store circle coordinates at compile time
-        const int v = 12;
-        float circle[4*v];
-        for( int i=0; i<2*v; i+=2) {
-            float a = i * (float)PI / v;
-            float s = sinf( a ), c = cosf( a );
-            circle[i+0] = cx + (circle_rad+1) * s;
-            circle[i+1] = cy + (circle_rad+1) * c;
-            circle[i+2*v] = cx + circle_rad * s;
-            circle[i+2*v+1] = cy + circle_rad * c;
-        }
-
-        glVertexPointer(2, GL_FLOAT, 2*sizeof(float), circle);
-
-        glColor4ub(0, 0, 0, 255);
-        glDrawArrays(GL_TRIANGLE_FAN, 0, v);
-        glColor4ub(255, 255, 255, 255);
-        glDrawArrays(GL_TRIANGLE_FAN, v, v);
-        glDisableClientState(GL_VERTEX_ARRAY);
-        glDisable( GL_LINE_SMOOTH );
-        glDisable( GL_POLYGON_SMOOTH );
-        glDisable(GL_BLEND);
-
-
-    }
-
-#endif
-}
 
 void ropeless_pi::RenderTransponder( transponder_state *state)
 {
@@ -1429,7 +937,7 @@ void ropeless_pi::RenderTransponder( transponder_state *state)
     m_oDC->DrawCircle( ab.x, ab.y, circle_size);
 
 
-#if 1
+#if 0
     // Render the history buffer, if present
     std::deque<transponder_state_history *>::iterator it = state->historyQ.begin();
     while (it != state->historyQ.end()){
@@ -1459,8 +967,32 @@ void ropeless_pi::RenderTransponder( transponder_state *state)
 
 }
 
+void ropeless_pi::RenderTrawlConnector( transponder_state *state1, transponder_state *state2 )
+{
+    wxPoint P1, P2;
+    GetCanvasPixLL(g_vp, &P1, state1->predicted_lat, state1->predicted_lon);
+    GetCanvasPixLL(g_vp, &P2, state2->predicted_lat, state2->predicted_lon);
+
+    wxColour rcolour = wxTheColourDatabase->Find(wxString("BLACK"));
+    wxPen dpen( rcolour, 3 );
+    wxBrush dbrush( rcolour );
+
+    m_oDC->DrawLine(P1.x, P1.y, P2.x, P2.y, true);
+}
 
 
+
+transponder_state *ropeless_pi::GetStateByIdent( int identTarget )
+{
+  transponder_state *rv = NULL;
+  for (unsigned int i = 0 ; i < transponderStatus.size() ; i++){
+    transponder_state *state = transponderStatus[i];
+    if ( state->ident == identTarget)
+      return state;
+  }
+
+  return rv;
+}
 
 void ropeless_pi::RenderTrawls()
 {
@@ -1470,6 +1002,12 @@ void ropeless_pi::RenderTrawls()
 
     RenderTransponder(state);
 
+    if (state->ident_partner != state->ident){
+      transponder_state *statePartner = GetStateByIdent( state->ident_partner );
+      if (statePartner){
+        RenderTrawlConnector( state, statePartner );
+      }
+    }
   }
 }
 
@@ -1509,21 +1047,6 @@ bool ropeless_pi::RenderOverlay(wxDC &dc, PlugIn_ViewPort *vp)
 //    delete g_gdc;
 //#endif
 
-#if 0
-    if( m_pBrgRolloverWin && m_pBrgRolloverWin->IsActive() ) {
-        dc.DrawBitmap( *(m_pBrgRolloverWin->GetBitmap()),
-                       m_pBrgRolloverWin->GetPosition().x,
-                       m_pBrgRolloverWin->GetPosition().y, false );
-    }
-
-    if( m_pTrackRolloverWin && m_pTrackRolloverWin->IsActive() ) {
-        dc.DrawBitmap( *(m_pTrackRolloverWin->GetBitmap()),
-                       m_pTrackRolloverWin->GetPosition().x,
-                       m_pTrackRolloverWin->GetPosition().y, false );
-    }
-
-
-#endif
 #endif
     return true;
 }
@@ -1541,40 +1064,13 @@ bool ropeless_pi::RenderGLOverlay(wxGLContext *pcontext, PlugIn_ViewPort *vp)
     g_vp = vp;
     Clone_VP(&g_ovp, vp);                // deep copy
 
-    double selec_radius = (10 / vp->view_scale_ppm) / (1852. * 60.);
-    m_select->SetSelectLLRadius(selec_radius);
+    m_selectRadius = (10 / vp->view_scale_ppm) / (1852. * 60.);
+
+    //m_select->SetSelectLLRadius(selec_radius);
 
     //Render
     RenderTrawls();
-#if 0
-    RenderIconGL(  );
 
-    if( m_pBrgRolloverWin && m_pBrgRolloverWin->IsActive() ) {
-        wxImage image = m_pBrgRolloverWin->GetBitmap()->ConvertToImage();
-        unsigned char *imgdata = image.GetData();
-        if(imgdata){
-            glRasterPos2i(m_pBrgRolloverWin->GetPosition().x, m_pBrgRolloverWin->GetPosition().y);
-
-            glPixelZoom(1.0, -1.0);
-            glDrawPixels(image.GetWidth(), image.GetHeight(), GL_RGB, GL_UNSIGNED_BYTE,imgdata);
-            glPixelZoom(1.0, 1.0);
-        }
-
-    }
-
-    if( m_pTrackRolloverWin && m_pTrackRolloverWin->IsActive() ) {
-        wxImage image = m_pTrackRolloverWin->GetBitmap()->ConvertToImage();
-        unsigned char *imgdata = image.GetData();
-        if(imgdata){
-            glRasterPos2i(m_pTrackRolloverWin->GetPosition().x, m_pTrackRolloverWin->GetPosition().y);
-
-            glPixelZoom(1.0, -1.0);
-            glDrawPixels(image.GetWidth(), image.GetHeight(), GL_RGB, GL_UNSIGNED_BYTE,imgdata);
-            glPixelZoom(1.0, 1.0);
-        }
-
-    }
-#endif
     return true;
 }
 
@@ -1610,6 +1106,7 @@ void ropeless_pi::ProcessRFACapture( void )
   else {                         // Maintain history buffer
     transponder_state_history *this_transponder_state_history = new transponder_state_history;
     this_transponder_state_history->ident = this_transponder_state->ident;
+    this_transponder_state_history->ident_partner = this_transponder_state->ident_partner;
     this_transponder_state_history->timeStamp = this_transponder_state->timeStamp;
     this_transponder_state_history->predicted_lat = this_transponder_state->predicted_lat;
     this_transponder_state_history->predicted_lon = this_transponder_state->predicted_lon;
@@ -1624,6 +1121,8 @@ void ropeless_pi::ProcessRFACapture( void )
 
   //  Update the instant record
   this_transponder_state->ident = transponderIdent;
+  this_transponder_state->ident_partner = m_NMEA0183.Rfa.TransponderPartner;
+
   this_transponder_state->timeStamp = m_NMEA0183.Rfa.TimeStamp;
 
   this_transponder_state->predicted_lat = m_NMEA0183.Rfa.TransponderPosition.Latitude.Latitude;
@@ -1641,6 +1140,35 @@ void ropeless_pi::ProcessRFACapture( void )
 }
 
 
+void ropeless_pi::ProcessRLACapture( void )
+{
+  if( m_NMEA0183.LastSentenceIDReceived != _T("RLA") )
+    return;
+
+  int transponderIdent = m_NMEA0183.Rla.TransponderCode;
+
+  // Check if status for this transponder is in the status vector
+  transponder_state *this_transponder_state = NULL;
+  for (unsigned int i = 0 ; i < transponderStatus.size() ; i++){
+    if (transponderStatus[i]->ident == transponderIdent){
+      this_transponder_state = transponderStatus[i];
+      break;
+    }
+  }
+
+  // If specified transponder is not present, ignore the message
+  if (this_transponder_state == NULL)
+    return;
+
+  // Update the record
+  this_transponder_state->release_status = m_NMEA0183.Rla.TransponderStatus;
+
+   if(m_pRLDialog){
+    m_pRLDialog->RefreshTransponderList();
+  }
+}
+
+
 void ropeless_pi::SetNMEASentence( wxString &sentence )
 {
     if (sentence.IsEmpty())
@@ -1653,57 +1181,11 @@ void ropeless_pi::SetNMEASentence( wxString &sentence )
             if( m_NMEA0183.Parse() )
                 ProcessRFACapture();
         }
-
-#if 0
-        else if( m_NMEA0183.LastSentenceIDReceived == _T("HDG") ) {
-            if( m_NMEA0183.Parse() ) {
-
-                    if( !wxIsNaN( m_NMEA0183.Hdg.MagneticVariationDegrees ) ){
-                        if( m_NMEA0183.Hdg.MagneticVariationDirection == East )
-                            mVar =  m_NMEA0183.Hdg.MagneticVariationDegrees;
-                        else if( m_NMEA0183.Hdg.MagneticVariationDirection == West )
-                            mVar = -m_NMEA0183.Hdg.MagneticVariationDegrees;
-                    }
-
-                    if( !wxIsNaN(m_NMEA0183.Hdg.MagneticSensorHeadingDegrees) ) {
-                        if( !wxIsNaN( mVar ) ){
-                            m_hdt = m_NMEA0183.Hdg.MagneticSensorHeadingDegrees + mVar;
-                            m_head_active = true;
-                            m_head_dog_timer.Start(5000, wxTIMER_ONE_SHOT);
-                        }
-                    }
-
-            }
+        if( m_NMEA0183.LastSentenceIDReceived == _T("RLA") ) {
+            if( m_NMEA0183.Parse() )
+                ProcessRLACapture();
         }
 
-        else if( m_NMEA0183.LastSentenceIDReceived == _T("HDM") ) {
-            if( m_NMEA0183.Parse() ) {
-
-                if( !wxIsNaN(m_NMEA0183.Hdm.DegreesMagnetic) ) {
-                    if( !wxIsNaN( mVar ) ){
-                        m_hdt = m_NMEA0183.Hdm.DegreesMagnetic + mVar;
-                        m_head_active = true;
-                        m_head_dog_timer.Start(5000, wxTIMER_ONE_SHOT);
-                    }
-                }
-
-            }
-        }
-
-        else if( m_NMEA0183.LastSentenceIDReceived == _T("HDT") ) {
-            if( m_NMEA0183.Parse() ) {
-                if( mPriHeadingT >= 1 ) {
-                    mPriHeadingT = 1;
-                    if( m_NMEA0183.Hdt.DegreesTrue < 999. ) {
-                        m_hdt = m_NMEA0183.Hdt.DegreesTrue;
-                        m_head_active = true;
-                        m_head_dog_timer.Start(5000, wxTIMER_ONE_SHOT);
-                    }
-                }
-            }
-        }
-
-#endif
 
     }
 }
@@ -1822,201 +1304,136 @@ void ropeless_pi::ApplyConfig( void )
 
 }
 
+
+bool ropeless_pi::MouseEventHook( wxMouseEvent &event )
+{
+    bool bret = false;
+
+    m_mouse_x = event.m_x;
+    m_mouse_y = event.m_y;
+
+//     //  Retrigger the rollover timer
+//     if( m_pBrgRolloverWin && m_pBrgRolloverWin->IsActive() )
+//         m_RolloverPopupTimer.Start( 10, wxTIMER_ONE_SHOT );               // faster response while the rollover is turned on
+//     else
+//         m_RolloverPopupTimer.Start( m_rollover_popup_timer_msec, wxTIMER_ONE_SHOT );
+
+    wxPoint mp(event.m_x, event.m_y);
+    GetCanvasLLPix( &g_ovp, mp, &m_cursor_lat, &m_cursor_lon);
+
+    m_foundState = NULL;
+    //  On button push, find any transponders
+    if( event.RightDown() || event.LeftDown()) {
+
+
+      for (unsigned int i = 0 ; i < transponderStatus.size() ; i++){
+        transponder_state *state = transponderStatus[i];
+
+        double a = fabs( m_cursor_lat - state->predicted_lat );
+        double b = fabs( m_cursor_lon - state->predicted_lon );
+
+        if( ( a < m_selectRadius ) && ( b < m_selectRadius ) ){
+          m_foundState = state;
+          break;
+        }
+      }
+
+
+
+//        m_pFind = m_select->FindSelection( m_cursor_lat, m_cursor_lon, SELTYPE_POINT_GENERIC );
+
+//        if(m_pFind){
 #if 0
-void ropeless_pi::ProcessBrgCapture(double brg_rel, double brg_subtended, double brg_TM, int brg_TM_flag,
-                           wxString Ident, wxString target)
-{
-    double brg_true = 0;
-    BearingTypeEnum type = TRUE_BRG;
+            for(unsigned int i=0 ; i < m_brg_array.GetCount() ; i++){
+                brg_line *pb = m_brg_array.Item(i);
 
-    double lat = m_ownship_lat;          // initial declaration causes bearling line to pass thru ownship
-    double lon = m_ownship_lon;
+                if(m_pFind->m_pData1 == pb){
+                    m_sel_brg = pb;
+                    m_sel_part = m_pFind->GetUserData();
+                    if(SEL_POINT_A == m_sel_part){
+                        m_sel_pt_lat = pb->GetLatA();
+                        m_sel_pt_lon = pb->GetLonA();
+                    }
+                    else {
+                        m_sel_pt_lat = pb->GetLatB();
+                        m_sel_pt_lon = pb->GetLonB();
+                    }
 
-    //  What initial length?
-    //  say 20% of canvas horizontal size, and max of 10 NMi
-
-    double l1 = ((g_ovp.pix_width / g_ovp.view_scale_ppm) /1852.) * 0.2;
-    double length = wxMin(l1, 10.0);
-
-
-    // Process the normal case where the bearing is ship-head relative
-
-    //  If we don't have a true heading available, use ownship cog
-    if(m_head_active)
-        brg_true = brg_rel + m_hdt;
-    else
-        brg_true = brg_rel + m_ownship_cog;
-
-    type = TRUE_BRG;
-
-    //  Do not add duplicates
-    bool b_add = true;
-    for(unsigned int i=0 ; i < m_brg_array.GetCount() ; i++){
-        brg_line *pb = m_brg_array.Item(i);
-        if(pb->GetIdent() == Ident){
-            b_add = false;
-            break;
-        }
-    }
-
-    if(b_add){
-        brg_line *brg = new brg_line(brg_true, type, lat, lon, length);
-        brg->SetIdent(Ident);
-        brg->SetTargetName(target);
-
-        m_brg_array.Add(brg);
-        m_select->AddSelectablePoint( brg->GetLatA(), brg->GetLonA(), brg, SELTYPE_POINT_GENERIC, SEL_POINT_A );
-        m_select->AddSelectablePoint( brg->GetLatB(), brg->GetLonB(), brg, SELTYPE_POINT_GENERIC, SEL_POINT_B );
-        m_select->AddSelectableSegment( brg->GetLatA(), brg->GetLonA(), brg->GetLatB(), brg->GetLonB(), brg, SEL_SEG );
-
-        GetOCPNCanvasWindow()->Refresh();
-
-    }
-
-    m_nfix = CalculateFix();
-}
+                    break;
+                }
+            }
 #endif
+//        }
+    }
 
-int ropeless_pi::CalculateFix( void )
-{
-    //  If there are two or more bearing lines stored, calculate the resulting fix
-    //  Also, keep an array of points defining the fix for later rendering
 
-    m_hat_array.Clear();
 
-    if(m_brg_array.GetCount() < 2)
-        return 0;
+    if( event.RightDown() ) {
 
-    double lat_acc = 0.;
-    double lon_acc = 0.;
-    int n_intersect = 0;
-    for(size_t i=0 ; i < m_brg_array.GetCount()-1 ; i++){
-        brg_line *a = m_brg_array.Item(i);
-        brg_line *b = m_brg_array.Item(i+1);
+        if( 1/*m_sel_brg || m_bshow_fix_hat*/){
 
-        double lat, lon;
-        if(a->getIntersect(b, &lat, &lon)){
-            lat_acc += lat;
-            lon_acc += lon;
-            n_intersect ++;
+            wxMenu* contextMenu = new wxMenu;
 
-            vector2D *pt = new vector2D(lon, lat);
-            m_hat_array.Add(pt);
+            wxMenuItem *release_item = 0;
+
+            if(m_foundState){
+                release_item = new wxMenuItem(contextMenu, ID_TPR_RELEASE, _("Release Transponder") );
+                contextMenu->Append(release_item);
+                GetOCPNCanvasWindow()->Connect( ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
+                                                wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, this );
+            }
+
+//             if(!m_bshow_fix_hat && m_sel_brg){
+//                 brg_item = new wxMenuItem(contextMenu, ID_EPL_DELETE, _("Delete Bearing") );
+//                 contextMenu->Append(brg_item);
+//                 GetOCPNCanvasWindow()->Connect( ID_EPL_DELETE, wxEVT_COMMAND_MENU_SELECTED,
+//                                                 wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, this );
+//             }
+
+//             if(m_bshow_fix_hat){
+//                 wxMenuItem *fix_item = new wxMenuItem(contextMenu, ID_EPL_XMIT, _("Send sighted fix to device") );
+//                 contextMenu->Append(fix_item);
+//                 GetOCPNCanvasWindow()->Connect( ID_EPL_XMIT, wxEVT_COMMAND_MENU_SELECTED,
+//                                                 wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, this );
+//             }
+
+            //   Invoke the drop-down menu
+            GetOCPNCanvasWindow()->PopupMenu( contextMenu, m_mouse_x, m_mouse_y );
+
+            if(release_item){
+                GetOCPNCanvasWindow()->Disconnect( ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
+                                                   wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, this );
+            }
+
+//             if(fix_item){
+//                 GetOCPNCanvasWindow()->Connect( ID_EPL_XMIT, wxEVT_COMMAND_MENU_SELECTED,
+//                                                 wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, this );
+//             }
+
+            bret = true;                // I have eaten this event
         }
-    }
-
-    if(m_brg_array.GetCount() > 2){
-        brg_line *a = m_brg_array.Item(0);
-        brg_line *b = m_brg_array.Item(m_brg_array.GetCount()-1);
-
-        double lat, lon;
-        if(a->getIntersect(b, &lat, &lon)){
-            lat_acc += lat;
-            lon_acc += lon;
-            n_intersect ++;
-
-            vector2D *pt = new vector2D(lon, lat);
-            m_hat_array.Add(pt);
-        }
 
     }
 
-    //  Have at least one intersection,
-    //  so calculate the fix as the average of all intersections
-    if(n_intersect){
-        m_fix_lat = lat_acc / n_intersect;
-        m_fix_lon = lon_acc / n_intersect;
+    else if( event.LeftDown() ) {
     }
 
-    return (n_intersect);
+//     if( event.LeftUp() ) {
+//         if(m_sel_brg)
+//             bret = true;
+//
+//         m_pFind = NULL;
+//         m_sel_brg = NULL;
+//
+//         m_nfix = CalculateFix();
+//
+//     }
 
+    return bret;
 }
 
 
-void ropeless_pi::RenderFixHat( void )
-{
-#if 0
-    if(!m_nfix)
-        return;                 // no fix
 
-    if(m_nfix == 1){            // two line fix
-
-        if(m_hat_array.GetCount() == 1){
-            vector2D *pt = m_hat_array.Item(0);
-            wxPoint ab;
-            GetCanvasPixLL(g_vp, &ab, pt->lat, pt->lon);
-
-            int crad = 20;
-            AlphaBlending( g_pdc, ab.x - crad, ab.y - crad, crad*2, crad *2, 3.0, m_FixHatColor, 250 );
-        }
-    }
-    else if(m_nfix > 2){
-
-        //      Get an array of wxPoints
-//        printf("\n");
-        wxPoint *pta = new wxPoint[m_nfix];
-        for(unsigned int i=0 ; i < m_hat_array.GetCount() ; i++){
-            vector2D *pt = m_hat_array.Item(i);
-            wxPoint ab;
-            GetCanvasPixLL(g_vp, &ab, pt->lat, pt->lon);
-//            printf("%g %g %d %d\n", pt->lat, pt->lon, ab.x, ab.y);
-            pta[i] = ab;
-        }
-
-        AlphaBlendingPoly( g_pdc, m_hat_array.GetCount(), pta, m_FixHatColor, 250 );
-
-    }
-#endif
-}
-
-
-void ropeless_pi::startSerial(const wxString &port)
-{
-    // verify the event handler
-    if(!m_event_handler){
-        m_event_handler = new PI_EventHandler(this);
-    }
-
-    if(port.Length()){
-        if(m_serialThread){
-        }
-
-//        m_serialThread = new PI_OCP_DataStreamInput_Thread( this, m_event_handler, port, _T("4800"), DS_TYPE_INPUT);
-        m_Thread_run_flag = 1;
-        m_serialThread->Run();
-    }
-}
-
-void ropeless_pi::stopSerial()
-{
-//    wxLogMessage( wxString::Format(_T("Closing NMEA Datastream %s"), m_portstring.c_str()) );
-
-    //    Kill off the Secondary RX Thread if alive
-    if(m_serialThread)
-    {
-        if(m_bsec_thread_active)              // Try to be sure thread object is still alive
-        {
- //           wxLogMessage(_T("Stopping Secondary Thread"));
-
-            m_Thread_run_flag = 0;
-            int tsec = 10;
-            while((m_Thread_run_flag >= 0) && (tsec--))
-                wxSleep(1);
-
-            wxString msg;
-            if(m_Thread_run_flag < 0)
-                msg.Printf(_T("Stopped in %d sec."), 10 - tsec);
-            else
-                msg.Printf(_T("Not Stopped after 10 sec."));
-            wxLogMessage(msg);
-        }
-
-        m_serialThread = NULL;
-        m_bsec_thread_active = false;
-    }
-
-
-}
 
 
 void ropeless_pi::ShowPreferencesDialog( wxWindow* parent )
@@ -2078,354 +1495,6 @@ void ropeless_pi::ShowPreferencesDialog( wxWindow* parent )
 #endif
 }
 
-void ropeless_pi::ProcessTenderFix( void )
-{
-    // Maintain selectable point
-    if(pos_valid){
-        if(!m_tenderSelect){
-            m_tenderSelect = m_select->AddSelectablePoint( gLat, gLon, this, SELTYPE_POINT_GENERIC, 0 );
-        }
-        else{
-            m_select->ModifySelectablePoint( gLat, gLon, this, SELTYPE_POINT_GENERIC );
-        }
-    }
-
-}
-
-//-----------------------------------------------------------------------------------------------------------------
-//
-//      Bearing Line Class implementation
-//
-//-----------------------------------------------------------------------------------------------------------------
-
-brg_line::brg_line(double bearing, BearingTypeEnum type)
-{
-    Init();
-
-    m_bearing = bearing;
-    m_type = type;
-}
-
-brg_line::brg_line(double bearing, BearingTypeEnum type, double lat_point, double lon_point, double length)
-{
-    Init();
-
-    m_bearing = bearing;
-    m_type = type;
-    if(TRUE_BRG == type)
-        m_bearing_true = bearing;
-    else
-        m_bearing_true = bearing - g_Var;
-
-    m_latA = lat_point;
-    m_lonA = lon_point;
-    m_length = length;
-
-    // shift point a just a bit (20% of length), to help make a cocked hat
-    double adj_lata, adj_lona;
-    double dy = -0.2 * m_length * 1852.0 * cos(m_bearing_true * PI / 180.);        // east/north in metres
-    double dx = -0.2 * m_length * 1852.0 * sin(m_bearing_true * PI / 180.);
-    fromSM_Plugin(dx, dy, m_latA, m_lonA, &adj_lata, &adj_lona);
-
-    m_latA = adj_lata;
-    m_lonA = adj_lona;
-
-    CalcPointB();
-}
-
-brg_line::~brg_line()
-{
-}
-
-
-void brg_line::Init(void)
-{
-    //  Set some innocent initial values
-    m_bearing = 0;
-    m_bearing_true = 0;
-    m_type = TRUE_BRG;
-    m_latA = m_latB = m_lonA = m_lonB = 0;
-    m_length = 100;
-
-    m_color = wxColour(0,0,0);
-    m_width = 4;
-
-    m_color_text = wxColour(0,0,0);
-
-    m_Font = wxTheFontList->FindOrCreateFont(12, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL);
-
-    m_create_time = wxDateTime::Now();
-    m_InfoBoxColor = wxTheColourDatabase->Find(_T("LIME GREEN"));
-
-}
-
-bool brg_line::getIntersect(brg_line* b, double* lat, double* lon)
-{
-    double ilat, ilon;
-
-    MyFlPoint p1; p1.x = this->m_lonA; p1.y = this->m_latA;
-    MyFlPoint p2; p2.x = this->m_lonB; p2.y = this->m_latB;
-    MyFlPoint p3; p3.x = b->m_lonA; p3.y = b->m_latA;
-    MyFlPoint p4; p4.x = b->m_lonB; p4.y = b->m_latB;
-
-
-    bool ret = LineIntersect( p1, p2, p3, p4, &ilon, &ilat);
-
-    if(lat)
-        *lat = ilat;
-    if(lon)
-        *lon = ilon;
-
-    return ret;
-
-}
-
-
-
-void brg_line::CalcPointB(void)
-{
-    //  We calculate the other endpoint using simple mercator projection
-
-    double dy = m_length * 1852.0 * cos(m_bearing_true * PI / 180.);        // east/north in metres
-    double dx = m_length * 1852.0 * sin(m_bearing_true * PI / 180.);
-
-    fromSM_Plugin(dx, dy, m_latA, m_lonA, &m_latB, &m_lonB);
-
-}
-
-void brg_line::CalcLength(void)
-{
-    // We re-calculate the length from the two endpoints
-    double dx, dy;
-    toSM_Plugin(m_latA, m_lonA, m_latB, m_lonB, &dx, &dy);
-    double distance = sqrt( (dx * dx) + (dy * dy));
-
-    m_length = distance / 1852.;
-}
-
-void brg_line::DrawInfoBox( void )
-{
-#if 0
-    //  Calculate the points
-    wxPoint ab;
-    GetCanvasPixLL(g_vp, &ab, m_latA, m_lonA);
-
-    wxPoint cd;
-    GetCanvasPixLL(g_vp, &cd, m_latB, m_lonB);
-
-    //  Draw a blank, semi-transparent box
-    // Where to draw the info box, by default?
-    //  Centered on the brg_line
-    int box_width = 200;
-    int box_height = 50;
-
-
-
-    //  Create the text info string
-    g_pdc->SetFont(*m_Font);
-
-    //  Use a sample string to gather some text font parameters
-    wxString info;
-    int sx, sy;
-    int ypitch;
-    int max_info_text_length = 0;
-    int xmargin = 5;    // margin for text in the box
-
-    wxString sample = _T("W");
-    g_pdc->GetTextExtent(sample, &sx, &sy);
-    ypitch = sy;    // line pitch
-
-    info.Printf(_T("Bearing: %g\n"), m_bearing_true);
-    g_pdc->GetTextExtent(info, &sx, &sy);
-    max_info_text_length = wxMax(max_info_text_length, sx);
-    int nlines = 1;
-
-    //  Now add some more lines
-    wxString info2 = _T("Capture time: ");
-    info2 << m_create_time.FormatDate() <<_T("  ") << m_create_time.FormatTime();
-    g_pdc->GetTextExtent(info2, &sx, &sy);
-    max_info_text_length = wxMax(max_info_text_length, sx);
-    info  << info2;
-    nlines++;
-
-    // Draw the blank box
-
-    // Size...
-    box_width = max_info_text_length + (xmargin * 2);
-    box_height = nlines * (ypitch + 4);
-
-    //Position...
-    int xp = ((ab.x + cd.x)/2) ;
-    int yp = ((ab.y + cd.y)/2) ;
-
-    double angle = 0.;
-    double distance = box_width * .75;
-
-    double dx = 0;
-    double dy = 0;
-//    double lx = 0;
-//    double ly = 0;
-
-    //  Position of info box depends on orientation of the bearing line.
-    if((m_bearing_true >0 ) && (m_bearing_true < 90)){
-        angle = m_bearing_true - 90.;
-        angle = angle * PI / 180.;
-        dx = distance * cos(angle);
-        dy = -distance * sin(angle);
-//        lx = 0;
-//        ly = 0;
-    }
-
-    else if((m_bearing_true > 90 ) && (m_bearing_true < 180)){
-      angle = m_bearing_true - 90.;
-      angle = angle * PI / 180.;
-      dx = (distance * sin(angle));
-      dy = -distance * cos(angle);
-//      lx = 0;
-//      ly = 0;
-    }
-
-  else if((m_bearing_true > 180 ) && (m_bearing_true < 270)){
-      angle = m_bearing_true - 90.;
-      angle = angle * PI / 180.;
-      dx = -(distance * sin(angle)) - box_width;
-      dy = distance * cos(angle);
-//      lx = box_width;
-//      ly = 0;
-  }
-
-  else if((m_bearing_true > 270 ) && (m_bearing_true < 360)){
-      angle = m_bearing_true - 90.;
-      angle = angle * PI / 180.;
-      dx = (distance * sin(angle)) - box_width;
-      dy = (-distance * cos(angle));
-//      lx = box_width;
-//      ly = 0;
-  }
-
-    int box_xp = xp + dx;
-    int box_yp = yp + dy;
-
-
-    AlphaBlending( g_pdc, box_xp, box_yp, box_width, box_height, 6.0, m_InfoBoxColor, 127 );
-
-    //  Leader line
-//    RenderLine(xp, yp, box_xp + lx, box_yp + ly, m_InfoBoxColor, 4);
-
-    //  Now draw the text
-
-    g_pdc->DrawLabel( info, wxRect( box_xp + xmargin, box_yp, box_width, box_height ),
-                      wxALIGN_LEFT | wxALIGN_CENTRE_VERTICAL);
-
-
-    if(g_pdc) {
-        wxPen ppbrg ( m_color, m_width );
-
-#if wxUSE_GRAPHICS_CONTEXT
-        g_gdc->SetPen(ppbrg);
-#endif
-
-        g_pdc->SetPen(ppbrg);
-    } else { /* opengl */
-
-#ifdef ocpnUSE_GL
-///glColor4ub(m_color.Red(), m_color.Green(), m_color.Blue(),  255/*m_color.Alpha()*/);
-#endif
-    }
-
-
-
-     if(g_pdc) {
-#if wxUSE_GRAPHICS_CONTEXT
-//        g_gdc->StrokeLine(ab.x, ab.y, cd.x, cd.y);
-#else
-//        g_dc->DrawLine(ab.x, ab.y, cd.x, cd.y);
-#endif
-     } else { /* opengl */
-#ifdef ocpnUSE_GL
-//        pof->DrawGLLine(ab.x, ab.y, cd.x, cd.y, 2);
-#endif
-     }
-#endif
-}
-
-
-
-void brg_line::DrawInfoAligned( void )
-{
-#if 0
-    //  Calculate the points
-    wxPoint ab;
-    GetCanvasPixLL(g_vp, &ab, m_latA, m_lonA);
-
-    wxPoint cd;
-    GetCanvasPixLL(g_vp, &cd, m_latB, m_lonB);
-
-    //  Create the text info string
-
-    wxString info;
-    info.Printf(_T("Bearing: %g"), m_bearing_true);
-    wxString degree = wxString::Format(_T("%cT"), 0x00B0); //_T("°");
-    info += degree;
-    wxString info2 = _T("  Ident: ");
-    info2 += m_Ident;
-
-    info += info2;
-
-    //  Use a screen DC to calulate the drawing location/size
-    wxScreenDC sdc;
-    sdc.SetFont(*m_Font);
-
-    int sx, sy;
-    sdc.GetTextExtent(info, &sx, &sy);
-
-    int offset = 5;
-    double angle = m_bearing_true * PI / 180.;
-
-    int off_x = offset * cos(angle);
-    int off_y = offset * sin(angle);
-
-    int ctr_x = -(sx/2) * sin(angle);
-    int ctr_y = (sx/2) * cos(angle);
-
-    if(m_bearing_true < 180.){
-        int xp, yp;
-        xp = ctr_x + off_x + (ab.x + cd.x)/2;
-        yp = ctr_y + off_y + (ab.y + cd.y)/2;
-
-        RenderText( g_pdc, g_gdc, info, m_Font, m_color_text, xp, yp, 90. - m_bearing_true);
-    }
-    else{
-        int xp, yp;
-        xp = -ctr_x - off_x + (ab.x + cd.x)/2;
-        yp = -ctr_y - off_y + (ab.y + cd.y)/2;
-
-        RenderText( g_pdc, g_gdc, info, m_Font, m_color_text, xp, yp, 90. - m_bearing_true + 180.);
-    }
-#endif
-}
-
-void brg_line::Draw( void )
-{
-    //  Calculate the points
-    wxPoint ab;
-    GetCanvasPixLL(g_vp, &ab, m_latA, m_lonA);
-
-    wxPoint cd;
-    GetCanvasPixLL(g_vp, &cd, m_latB, m_lonB);
-
-    //  Adjust the rendering width, to make it 100 metres wide
-    double dwidth = 100 * g_ovp.view_scale_ppm;
-
-    dwidth = wxMin(4, dwidth);
-    dwidth = wxMax(2, dwidth);
-
-//    printf("%g\n", dwidth);
-    //RenderLine(g_pdc, g_gdc, ab.x, ab.y, cd.x, cd.y, m_color, dwidth);
-
-}
-
-
 
 
 //      Event Handler implementation
@@ -2464,6 +1533,7 @@ void PI_EventHandler::PopupMenuHandler(wxCommandEvent& event )
 
 void PI_EventHandler::OnEvtOCPN_NMEA( PI_OCPN_DataStreamEvent& event )
 {
+#if 0
     wxString str_buf = event.ProcessNMEA4Tags();
 
     g_NMEA0183 << str_buf;
@@ -2563,15 +1633,14 @@ void PI_EventHandler::OnEvtOCPN_NMEA( PI_OCPN_DataStreamEvent& event )
               }
 
     }
-
+#endif
 }
 
 
 
-wxArrayString *EnumerateSerialPorts( void );
 
 BEGIN_EVENT_TABLE( RopelessDialog, wxDialog )
-EVT_BUTTON( wxID_OK, RopelessDialog::OnTenderPrefsOkClick )
+EVT_BUTTON( wxID_OK, RopelessDialog::OnOkClick )
 EVT_CLOSE(RopelessDialog::OnClose)
 END_EVENT_TABLE()
 
@@ -2601,6 +1670,9 @@ RopelessDialog::RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi,
 
         colWidth = dx * 6;
         m_pListCtrlTranponders->InsertColumn(tlIDENT, _("Ident"), wxLIST_FORMAT_LEFT,  colWidth);
+
+        colWidth = dx * 13;
+        m_pListCtrlTranponders->InsertColumn(tlRELEASE_STATUS, _("Release Status"), wxLIST_FORMAT_LEFT, colWidth);
 
         colWidth = dx * 18;
         m_pListCtrlTranponders->InsertColumn(tlTIMESTAMP, _("LastReportTime (UTC)"), wxLIST_FORMAT_LEFT, colWidth);
@@ -2673,7 +1745,7 @@ RopelessDialog::RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi,
           m_StartSimButton->Show();
         }
 
-
+#if 0
         wxStaticBoxSizer* sbSizerP = new wxStaticBoxSizer( new wxStaticBox( this, wxID_ANY, _("Tender GPS Serial Port") ), wxVERTICAL );
 
         m_comboPort = new wxComboBox(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0, NULL, 0);
@@ -2723,6 +1795,7 @@ RopelessDialog::RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi,
         for (size_t i = 0; i < g_iconTypeArray.Count(); i++) {
             m_comboIcon->Append(g_iconTypeArray.Item(i));
         }
+#endif
 
 #if 0
         // Icon parameters
@@ -2799,7 +1872,7 @@ RopelessDialog::RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi,
 
 RopelessDialog::~RopelessDialog()
 {
-        delete m_pSerialArray;
+        //delete m_pSerialArray;
 }
 
 void RopelessDialog::RefreshTransponderList()
@@ -2824,9 +1897,19 @@ void RopelessDialog::RefreshTransponderList()
     item.SetText(sid);
     m_pListCtrlTranponders->SetItem(item);
 
+    item.SetColumn(tlRELEASE_STATUS);
+    wxString srs;
+    if (state->release_status == -2)
+      sid = "---";
+    else
+      sid.Printf("%d", state->release_status);
+    item.SetText(sid);
+    m_pListCtrlTranponders->SetItem(item);
+
     item.SetColumn(tlTIMESTAMP);
     wxString sts;
-    wxDateTime ts = DaysTowDT(state->timeStamp);
+    //wxDateTime ts = DaysTowDT(state->timeStamp);
+    wxDateTime ts((time_t)(state->timeStamp));
     ts.MakeUTC();
     sts = ts.FormatISOCombined(' ');
     //sts.Printf("%g", state->timeStamp);
@@ -2895,523 +1978,14 @@ void RopelessDialog::OnClose(wxCloseEvent& event)
 	event.Skip();
 }
 
-void RopelessDialog::OnTenderPrefsOkClick(wxCommandEvent& event)
+void RopelessDialog::OnOkClick(wxCommandEvent& event)
 {
-    m_trackedPointName = m_wpComboPort->GetValue();
+    m_StopSimButton->Hide();
+    m_StartSimButton->Show();
+    g_ropelessPI->stopSim();
 
-    wxArrayString guidArray = GetWaypointGUIDArray();
-    for(unsigned int i=0 ; i < guidArray.GetCount() ; i++){
-        wxString name = getWaypointName( guidArray[i] );
-        if(name.Length()){
-            if(name.IsSameAs(m_trackedPointName)){
-                m_trackedPointGUID = guidArray[i];
-                break;
-            }
-        }
-    }
-
-    EndModal( wxID_OK );
-
+    //EndModal( wxID_OK );
+    Close();
 }
-
-
-
-
-/*
- *     Enumerate all the serial ports on the system
- *
- *     wxArrayString *EnumerateSerialPorts(void)
-
- *     Very system specific, unavoidably.
- */
-
-#if defined(__UNIX__) && !defined(__OCPN__ANDROID__) && !defined(__WXOSX__)
-extern "C" int wait(int *);                     // POSIX wait() for process
-
-#include <termios.h>
-#include <sys/ioctl.h>
-#include <linux/serial.h>
-
-#endif
-
-// ****************************************
-// Fulup devices selection with scandir
-// ****************************************
-
-// reserve 4 pattern for plugins
-char* devPatern[] = {
-  NULL,NULL,NULL,NULL,
-  NULL,NULL,NULL,NULL, (char*)-1};
-
-
-// This function allow external plugin to search for a special device name
-// ------------------------------------------------------------------------
-int paternAdd (const char* patern) {
-  int ind;
-
-  // snan table for a free slot inside devpatern table
-  for (ind=0; devPatern[ind] != (char*)-1; ind++)
-       if (devPatern[ind] == NULL) break;
-
-  // table if full
-  if  (devPatern [ind] == (char*) -1) return -1;
-
-  // store a copy of the patern in case calling routine had it on its stack
-  devPatern [ind]  = strdup (patern);
-  return 0;
-}
-
-
-#if defined(__UNIX__) && !defined(__OCPN__ANDROID__) && !defined(__WXOSX__)
-// This filter verify is device is withing searched patern and verify it is openable
-// -----------------------------------------------------------------------------------
-int paternFilter (const struct dirent * dir) {
- char* res = NULL;
- char  devname [512];
- int   fd, ind;
-
-  // search if devname fits with searched paterns
-  for (ind=0; devPatern [ind] != (char*)-1; ind++) {
-     if (devPatern [ind] != NULL) res=(char*)strcasestr(dir->d_name,devPatern [ind]);
-     if (res != NULL) break;
-  }
-
-  // File does not fit researched patern
-  if (res == NULL) return 0;
-
-  // Check if we may open this file
-  snprintf (devname, sizeof (devname), "/dev/%s", dir->d_name);
-  fd = open(devname, O_RDWR|O_NDELAY|O_NOCTTY);
-
-  // device name is pointing to a real device
-  if(fd > 0) {
-    close (fd);
-    return 1;
-  }
-
-  // file is not valid
-  perror (devname);
-  return 0;
-}
-
-int isTTYreal(const char *dev)
-{
-    struct serial_struct serinfo;
-    int ret = 0;
-
-    int fd = open(dev, O_RDWR | O_NONBLOCK | O_NOCTTY);
-
-    // device name is pointing to a real device
-    if(fd >= 0) {
-        if (ioctl(fd, TIOCGSERIAL, &serinfo)==0) {
-            // If device type is no PORT_UNKNOWN we accept the port
-            if (serinfo.type != PORT_UNKNOWN)
-                ret = 1;
-        }
-        close (fd);
-    }
-
-    return ret;
-}
-
-
-#endif
-
-#ifdef __MINGW32__ // do I need this because of mingw, or because I am running mingw under wine?
-# ifndef GUID_CLASS_COMPORT
-DEFINE_GUID(GUID_CLASS_COMPORT, 0x86e0d1e0L, 0x8089, 0x11d0, 0x9c, 0xe4, 0x08, 0x00, 0x3e, 0x30, 0x1f, 0x73);
-# endif
-#endif
-
-wxArrayString *EnumerateSerialPorts( void )
-{
-    wxArrayString *preturn = new wxArrayString;
-
-#if defined(__UNIX__) && !defined(__OCPN__ANDROID__) && !defined(__WXOSX__)
-
-    //Initialize the pattern table
-    if( devPatern[0] == NULL ) {
-        paternAdd ( "ttyUSB" );
-        paternAdd ( "ttyACM" );
-        paternAdd ( "ttyGPS" );
-        paternAdd ( "refcom" );
-    }
-
- //  Looking for user privilege openable devices in /dev
- //  Fulup use scandir to improve user experience and support new generation of AIS devices.
-
-      wxString sdev;
-      int ind, fcount;
-      struct dirent **filelist = {0};
-
-      // scan directory filter is applied automatically by this call
-      fcount = scandir("/dev", &filelist, paternFilter, alphasort);
-
-      for(ind = 0; ind < fcount; ind++)  {
-       wxString sdev (filelist[ind]->d_name, wxConvUTF8);
-       sdev.Prepend (_T("/dev/"));
-
-       preturn->Add (sdev);
-       free(filelist[ind]);
-      }
-
-      free(filelist);
-
-//        We try to add a few more, arbitrarily, for those systems that have fixed, traditional COM ports
-
-    if( isTTYreal("/dev/ttyS0") )
-        preturn->Add( _T("/dev/ttyS0") );
-
-    if( isTTYreal("/dev/ttyS1") )
-        preturn->Add( _T("/dev/ttyS1") );
-
-
-#endif
-
-#ifdef PROBE_PORTS__WITH_HELPER
-
-    /*
-     *     For modern Linux/(Posix??) systems, we may use
-     *     the system files /proc/tty/driver/serial
-     *     and /proc/tty/driver/usbserial to identify
-     *     available serial ports.
-     *     A complicating factor is that most (all??) linux
-     *     systems require root privileges to access these files.
-     *     We will use a helper program method here, despite implied vulnerability.
-     */
-
-    char buf[256]; // enough to hold one line from serial devices list
-    char left_digit;
-    char right_digit;
-    int port_num;
-    FILE *f;
-
-    pid_t pID = vfork();
-
-    if (pID == 0)// child
-    {
-//    Temporarily gain root privileges
-        seteuid(file_user_id);
-
-//  Execute the helper program
-        execlp("ocpnhelper", "ocpnhelper", "-SB", NULL);
-
-//  Return to user privileges
-        seteuid(user_user_id);
-
-        wxLogMessage(_T("Warning: ocpnhelper failed...."));
-        _exit(0);// If exec fails then exit forked process.
-    }
-
-    wait(NULL);                  // for the child to quit
-
-//    Read and parse the files
-
-    /*
-     * see if we have any traditional ttySx ports available
-     */
-    f = fopen("/var/tmp/serial", "r");
-
-    if (f != NULL)
-    {
-        wxLogMessage(_T("Parsing copy of /proc/tty/driver/serial..."));
-
-        /* read in each line of the file */
-        while(fgets(buf, sizeof(buf), f) != NULL)
-        {
-            wxString sm(buf, wxConvUTF8);
-            sm.Prepend(_T("   "));
-            sm.Replace(_T("\n"), _T(" "));
-            wxLogMessage(sm);
-
-            /* if the line doesn't start with a number get the next line */
-            if (buf[0] < '0' || buf[0] > '9')
-            continue;
-
-            /*
-             * convert digits to an int
-             */
-            left_digit = buf[0];
-            right_digit = buf[1];
-            if (right_digit < '0' || right_digit > '9')
-            port_num = left_digit - '0';
-            else
-            port_num = (left_digit - '0') * 10 + right_digit - '0';
-
-            /* skip if "unknown" in the string */
-            if (strstr(buf, "unknown") != NULL)
-            continue;
-
-            /* upper limit of 15 */
-            if (port_num > 15)
-            continue;
-
-            /* create string from port_num  */
-
-            wxString s;
-            s.Printf(_T("/dev/ttyS%d"), port_num);
-
-            /*  add to the output array  */
-            preturn->Add(wxString(s));
-
-        }
-
-        fclose(f);
-    }
-
-    /*
-     * Same for USB ports
-     */
-    f = fopen("/var/tmp/usbserial", "r");
-
-    if (f != NULL)
-    {
-        wxLogMessage(_T("Parsing copy of /proc/tty/driver/usbserial..."));
-
-        /* read in each line of the file */
-        while(fgets(buf, sizeof(buf), f) != NULL)
-        {
-
-            wxString sm(buf, wxConvUTF8);
-            sm.Prepend(_T("   "));
-            sm.Replace(_T("\n"), _T(" "));
-            wxLogMessage(sm);
-
-            /* if the line doesn't start with a number get the next line */
-            if (buf[0] < '0' || buf[0] > '9')
-            continue;
-
-            /*
-             * convert digits to an int
-             */
-            left_digit = buf[0];
-            right_digit = buf[1];
-            if (right_digit < '0' || right_digit > '9')
-            port_num = left_digit - '0';
-            else
-            port_num = (left_digit - '0') * 10 + right_digit - '0';
-
-            /* skip if "unknown" in the string */
-            if (strstr(buf, "unknown") != NULL)
-            continue;
-
-            /* upper limit of 15 */
-            if (port_num > 15)
-            continue;
-
-            /* create string from port_num  */
-
-            wxString s;
-            s.Printf(_T("/dev/ttyUSB%d"), port_num);
-
-            /*  add to the output array  */
-            preturn->Add(wxString(s));
-
-        }
-
-        fclose(f);
-    }
-
-    //    As a fallback, in case seteuid doesn't work....
-    //    provide some defaults
-    //    This is currently the case for GTK+, which
-    //    refuses to run suid.  sigh...
-
-    if(preturn->IsEmpty())
-    {
-        preturn->Add( _T("/dev/ttyS0"));
-        preturn->Add( _T("/dev/ttyS1"));
-        preturn->Add( _T("/dev/ttyUSB0"));
-        preturn->Add( _T("/dev/ttyUSB1"));
-        preturn->Add( _T("/dev/ttyACM0"));
-        preturn->Add( _T("/dev/ttyACM1"));
-    }
-
-//    Clean up the temporary files created by helper.
-    pid_t cpID = vfork();
-
-    if (cpID == 0)// child
-    {
-//    Temporarily gain root privileges
-        seteuid(file_user_id);
-
-//  Execute the helper program
-        execlp("ocpnhelper", "ocpnhelper", "-U", NULL);
-
-//  Return to user privileges
-        seteuid(user_user_id);
-        _exit(0);// If exec fails then exit forked process.
-    }
-
-#endif      // __WXGTK__
-#ifdef __WXOSX__
-#include "macutils.h"
-    char* paPortNames[MAX_SERIAL_PORTS];
-    int iPortNameCount;
-
-    memset(paPortNames,0x00,sizeof(paPortNames));
-    iPortNameCount = FindSerialPortNames(&paPortNames[0],MAX_SERIAL_PORTS);
-    for (int iPortIndex=0; iPortIndex<iPortNameCount; iPortIndex++)
-    {
-        wxString sm(paPortNames[iPortIndex], wxConvUTF8);
-        preturn->Add(sm);
-        free(paPortNames[iPortIndex]);
-    }
-#endif      //__WXOSX__
-#ifdef __WXMSW__
-    /*************************************************************************
-     * Windows provides no system level enumeration of available serial ports
-     * There are several ways of doing this.
-     *
-     *************************************************************************/
-
-#include <windows.h>
-
-    //    Method 1:  Use GetDefaultCommConfig()
-    // Try first {g_nCOMPortCheck} possible COM ports, check for a default configuration
-    //  This method will not find some Bluetooth SPP ports
-    for( int i = 1; i < 8; i++ ) {
-        wxString s;
-        s.Printf( _T("COM%d"), i );
-
-        COMMCONFIG cc;
-        DWORD dwSize = sizeof(COMMCONFIG);
-        if( GetDefaultCommConfig( s.fn_str(), &cc, &dwSize ) )
-            preturn->Add( wxString( s ) );
-    }
-
-#if 0
-    // Method 2:  Use FileOpen()
-    // Try all 255 possible COM ports, check to see if it can be opened, or if
-    // not, that an expected error is returned.
-
-    BOOL bFound;
-    for (int j=1; j<256; j++)
-    {
-        char s[20];
-        sprintf(s, "\\\\.\\COM%d", j);
-
-        // Open the port tentatively
-        BOOL bSuccess = FALSE;
-        HANDLE hComm = ::CreateFile(s, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, 0, 0);
-
-        //  Check for the error returns that indicate a port is there, but not currently useable
-        if (hComm == INVALID_HANDLE_VALUE)
-        {
-            DWORD dwError = GetLastError();
-
-            if (dwError == ERROR_ACCESS_DENIED ||
-                    dwError == ERROR_GEN_FAILURE ||
-                    dwError == ERROR_SHARING_VIOLATION ||
-                    dwError == ERROR_SEM_TIMEOUT)
-            bFound = TRUE;
-        }
-        else
-        {
-            bFound = TRUE;
-            CloseHandle(hComm);
-        }
-
-        if (bFound)
-        preturn->Add(wxString(s));
-    }
-#endif
-
-    // Method 3:  WDM-Setupapi
-    //  This method may not find XPort virtual ports,
-    //  but does find Bluetooth SPP ports
-
-    GUID *guidDev = (GUID*) &GUID_CLASS_COMPORT;
-
-    HDEVINFO hDevInfo = INVALID_HANDLE_VALUE;
-
-    hDevInfo = SetupDiGetClassDevs( guidDev,
-                                     NULL,
-                                     NULL,
-                                     DIGCF_PRESENT | DIGCF_DEVICEINTERFACE );
-
-    if(hDevInfo != INVALID_HANDLE_VALUE) {
-
-        BOOL bOk = TRUE;
-        SP_DEVICE_INTERFACE_DATA ifcData;
-
-        ifcData.cbSize = sizeof(SP_DEVICE_INTERFACE_DATA);
-        for (DWORD ii=0; bOk; ii++) {
-            bOk = SetupDiEnumDeviceInterfaces(hDevInfo, NULL, guidDev, ii, &ifcData);
-            if (bOk) {
-            // Got a device. Get the details.
-
-                SP_DEVINFO_DATA devdata = {sizeof(SP_DEVINFO_DATA)};
-                bOk = SetupDiGetDeviceInterfaceDetail(hDevInfo,
-                                                      &ifcData, NULL, 0, NULL, &devdata);
-
-                //      We really only need devdata
-                if( !bOk ) {
-                    if( GetLastError() == 122)  //ERROR_INSUFFICIENT_BUFFER, OK in this case
-                        bOk = true;
-                }
-//#if 0
-                //      We could get friendly name and/or description here
-                TCHAR fname[256] = {0};
-                TCHAR desc[256] ={0};
-                if (bOk) {
-                    BOOL bSuccess = SetupDiGetDeviceRegistryProperty(
-                        hDevInfo, &devdata, SPDRP_FRIENDLYNAME, NULL,
-                        (PBYTE)fname, sizeof(fname), NULL);
-
-                    bSuccess = bSuccess && SetupDiGetDeviceRegistryProperty(
-                        hDevInfo, &devdata, SPDRP_DEVICEDESC, NULL,
-                        (PBYTE)desc, sizeof(desc), NULL);
-                }
-//#endif
-                //  Get the "COMn string from the registry key
-                if(bOk) {
-                    bool bFoundCom = false;
-                    TCHAR dname[256];
-                    HKEY hDeviceRegistryKey = SetupDiOpenDevRegKey(hDevInfo, &devdata,
-                                                                   DICS_FLAG_GLOBAL, 0,
-                                                                   DIREG_DEV, KEY_QUERY_VALUE);
-                    if(INVALID_HANDLE_VALUE != hDeviceRegistryKey) {
-                            DWORD RegKeyType;
-                            wchar_t    wport[80];
-                            LPCWSTR cstr = wport;
-                            MultiByteToWideChar( 0, 0, "PortName", -1, wport, 80);
-                            DWORD len = sizeof(dname);
-
-                            int result = RegQueryValueEx(hDeviceRegistryKey, cstr,
-                                                        0, &RegKeyType, (PBYTE)dname, &len );
-                            if( result == 0 )
-                                bFoundCom = true;
-                    }
-
-                    if( bFoundCom ) {
-                        wxString port( dname, wxConvUTF8 );
-
-                        //      If the port has already been found, remove the prior entry
-                        //      in favor of this entry, which will have descriptive information appended
-                        for( unsigned int n=0 ; n < preturn->GetCount() ; n++ ) {
-                            if((preturn->Item(n)).IsSameAs(port)){
-                                preturn->RemoveAt( n );
-                                break;
-                            }
-                        }
-                        wxString desc_name( desc, wxConvUTF8 );         // append "description"
-                        port += _T(" ");
-                        port += desc_name;
-
-                        preturn->Add( port );
-                    }
-                }
-            }
-        }//for
-    }// if
-
-#endif      //__WXMSW__
-    return preturn;
-}
-
-
-
-
 
 

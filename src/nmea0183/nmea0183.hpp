@@ -114,6 +114,7 @@
 #include "vlw.hpp"
 #include "ebl.hpp"
 #include "rfa.hpp"
+#include "rla.hpp"
 /*
 #include "ROT.hpp"
 #include "RPM.hpp"
@@ -256,6 +257,7 @@ class NMEA0183
 */
       EBL Ebl;
       RFA Rfa;
+      RLA Rla;
 
       wxString ErrorMessage; // Filled when Parse returns FALSE
       wxString LastSentenceIDParsed; // ID of the lst sentence successfully parsed

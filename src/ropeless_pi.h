@@ -34,8 +34,8 @@
   #include "wx/wx.h"
 #endif //precompiled headers
 
-#define     PLUGIN_VERSION_MAJOR    0
-#define     PLUGIN_VERSION_MINOR    6
+//#define     PLUGIN_VERSION_MAJOR    0
+//#define     PLUGIN_VERSION_MINOR    6
 
 #define     MY_API_VERSION_MAJOR    1
 #define     MY_API_VERSION_MINOR    12
@@ -62,6 +62,7 @@
 #include "vector2d.h"
 #include "OCPN_DataStreamEvent.h"
 #include <deque>
+#include <wx/socket.h>
 
 #define EPL_TOOL_POSITION -1          // Request default positioning of toolbar tool
 
@@ -79,6 +80,7 @@
 //      Menu items
 #define ID_EPL_DELETE           8867
 #define ID_EPL_XMIT             8868
+#define ID_TPR_RELEASE          8869
 
 //      Message IDs
 #define SIM_TIMER 5003
@@ -90,13 +92,13 @@
 enum {
   tlICON = 0,
   tlIDENT,
-  tlTIMESTAMP
+  tlTIMESTAMP,
+  tlRELEASE_STATUS
 };  // Transponder list Columns;
 
 //----------------------------------------------------------------------------------------------------------
 //    Forward declarations
 //----------------------------------------------------------------------------------------------------------
-class brg_line;
 class Select;
 class SelectItem;
 class PI_EventHandler;
@@ -104,7 +106,6 @@ class PI_OCP_DataStreamInput_Thread;
 class RopelessDialog;
 class OCPNListCtrl;
 
-WX_DECLARE_OBJARRAY(brg_line *, ArrayOfBrgLines);
 WX_DECLARE_OBJARRAY(vector2D *, ArrayOf2DPoints);
 
 //void AlphaBlending( wxDC *pdc, int x, int y, int size_x, int size_y, float radius, wxColour color,
@@ -121,6 +122,7 @@ public:
   ~transponder_state_history(){};
 
   int ident;
+  int ident_partner;
   int color_index;
   double timeStamp;
   double predicted_lat;
@@ -131,14 +133,16 @@ public:
 
 class transponder_state {
 public:
-  transponder_state(){};
+  transponder_state(){ release_status = -2;};
   ~transponder_state(){};
 
   int ident;
+  int ident_partner;
   int color_index;
   double timeStamp;
   double predicted_lat;
   double predicted_lon;
+  int release_status;
   std::deque<transponder_state_history *> historyQ;
 
 };
@@ -182,7 +186,7 @@ public:
       bool RenderGLOverlay(wxGLContext *pcontext, PlugIn_ViewPort *vp);
       bool MouseEventHook( wxMouseEvent &event );
 
-      void OnRolloverPopupTimerEvent( wxTimerEvent& event );
+//      void OnRolloverPopupTimerEvent( wxTimerEvent& event );
       void PopupMenuHandler( wxCommandEvent& event );
 
       bool SaveConfig(void);
@@ -192,7 +196,7 @@ public:
 
       void ProcessTimerEvent( wxTimerEvent& event );
       void ProcessSimTimerEvent( wxTimerEvent& event );
-      void RenderFixHat( void );
+//      void RenderFixHat( void );
       void ShowPreferencesDialog( wxWindow* parent );
 
       //    Secondary thread life toggle
@@ -204,7 +208,7 @@ public:
       bool                m_bsec_thread_active;
       int                 m_Thread_run_flag;
 
-      void ProcessTenderFix( void );
+//      void ProcessTenderFix( void );
 
       std::vector<transponder_state *>transponderStatus;
 
@@ -224,20 +228,14 @@ private:
       bool LoadConfig(void);
       void ApplyConfig(void);
 
-      void setIcon( char ** xpm_bits);
-      void RenderIconDC( wxDC &dc );
-      void RenderIconGL( );
+      transponder_state *GetStateByIdent( int identTarget );
       void RenderTransponder(transponder_state *state);
       void RenderTrawls();
-
-
-      void ComputeShipScaleFactor(float icon_hdt, int ownShipWidth, int ownShipLength,
-                                             wxPoint &lShipMidPoint, wxPoint &GPSOffsetPixels,
-                                             wxPoint lGPSPoint, float &scale_factor_x, float &scale_factor_y);
-
+      void RenderTrawlConnector( transponder_state *state1, transponder_state *state2 );
 
 
       void ProcessRFACapture( void );
+      void ProcessRLACapture( void );
 
       void SaveTransponderStatus();
       void populateTransponderNode(pugi::xml_node &transponderNode,
@@ -246,11 +244,14 @@ private:
       bool parseTransponderNode(pugi::xml_node &transponderNode,
                             transponder_state *state);
 
-      int CalculateFix( void );
-      void setTrackedWPSelect(wxString GUID);
+      bool SendReleaseMessage(transponder_state *state);
+      unsigned char ComputeChecksum( wxString msg );
 
-      void startSerial(const wxString &port);
-      void stopSerial( void );
+//      int CalculateFix( void );
+//      void setTrackedWPSelect(wxString GUID);
+
+//      void startSerial(const wxString &port);
+//      void stopSerial( void );
 
       wxBitmap         *m_pplugin_icon;
       wxFileConfig     *m_pconfig;
@@ -266,7 +267,7 @@ private:
 
       Select               *m_select;
 
-      ArrayOfBrgLines      m_brg_array;
+//      ArrayOfBrgLines      m_brg_array;
       double               m_fix_lat;
       double               m_fix_lon;
       ArrayOf2DPoints      m_hat_array;
@@ -274,7 +275,7 @@ private:
       bool                 m_bshow_fix_hat;
 
       //        Selection variables
-      brg_line             *m_sel_brg;
+ //     brg_line             *m_sel_brg;
       int                  m_sel_part;
       SelectItem           *m_pFind;
       double               m_sel_pt_lat;
@@ -311,7 +312,7 @@ private:
 
 
       //        Rollover Window support
-      brg_line             *m_pRolloverBrg;
+//      brg_line             *m_pRolloverBrg;
       RolloverWin          *m_pBrgRolloverWin;
       wxTimer               m_RolloverPopupTimer;
       int                   m_rollover_popup_timer_msec;
@@ -348,7 +349,11 @@ private:
 
      RopelessDialog         *m_pRLDialog;
      wxWindow               *m_parent_window;
+     double                 m_selectRadius;
+     transponder_state      *m_foundState;
 
+     wxSocketBase*          m_tsock;
+     wxIPV4address          m_tconn_addr;
 
      DECLARE_EVENT_TABLE();
 
@@ -380,72 +385,6 @@ typedef enum BearingTypeEnum
     MAG_BRG = 0,
     TRUE_BRG
 }_BearingTypeEnum;
-
-
-//    Generic Bearing line class definition
-class brg_line
-{
-public:
-    brg_line(double bearing, BearingTypeEnum type);
-    brg_line(double bearing, BearingTypeEnum type, double lat_point, double lon_point, double length);
-    ~brg_line();
-
-    // Accessors
-    void SetColor(wxColour &color);
-    void SetWidth(int width);
-    void SetStyle(int style);
-    double GetLatA(){ return m_latA; }
-    double GetLonA(){ return m_lonA; }
-    double GetLatB(){ return m_latB; }
-    double GetLonB(){ return m_lonB; }
-    double GetBearingTrue(){ return m_bearing_true; }
-
-    void SetIdent(wxString Ident){ m_Ident = Ident; }
-    void SetTargetName( wxString target){ m_TargetName = target; };
-    wxString GetIdent(){ return m_Ident; }
-    wxString GetTargetName(){ return m_TargetName; }
-
-    void CalcPointB( void );
-    void CalcLength( void );
-
-    //  Public methods
-    void Draw( void );
-    void DrawInfoBox( void );
-    void DrawInfoAligned( void );
-
-    bool getIntersect(brg_line *b, double *lat, double *lon);
-
-
-    double      m_latA;
-    double      m_lonA;
-    double      m_latB;
-    double      m_lonB;
-
-
-private:
-    //  Methods
-    void        Init(void);
-
-
-    wxString    m_TargetName;
-    wxString    m_Ident;
-
-    BearingTypeEnum m_type;
-    double      m_bearing;
-    double      m_bearing_true;
-
-
-    double      m_length;   // Nautical Miles
-
-    wxColour    m_color;
-    int         m_width;
-    wxFont      *m_Font;
-    wxColour    m_color_text;
-
-    wxDateTime   m_create_time;
-    wxColour    m_InfoBoxColor;
-
-};
 
 
 
@@ -489,7 +428,7 @@ public:
 
     RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi, wxWindowID id = wxID_ANY, const wxString& title = _("Ropeless"), const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxDefaultSize, long style = wxCAPTION|wxDEFAULT_DIALOG_STYLE );
     ~RopelessDialog();
-    void OnTenderPrefsOkClick(wxCommandEvent& event);
+    void OnOkClick(wxCommandEvent& event);
 
     void OnClose(wxCloseEvent& event);
 

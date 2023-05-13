@@ -29,53 +29,104 @@
  *         "It is BSD license, do with it what you will"                   *
  */
 
-#if ! defined( RFA_CLASS_HEADER )
-#define RFA_CLASS_HEADER
 
-/*
-** Author: Samuel R. Blackburn
-** CI$: 76300,326
-** Internet: sammy@sed.csc.com
-**
-** You can use it any way you like.
-*/
+#include "nmea0183.h"
 
-class RFA : public RESPONSE
+
+
+RLA::RLA()
 {
+    Mnemonic = _T("RLA");
+   Empty();
+}
 
-   public:
+RLA::~RLA()
+{
+   Mnemonic.Empty();
+   Empty();
+}
 
-      RFA();
-     ~RFA();
+void RLA::Empty( void )
+{
+}
 
-      /*
-      ** Data
-      */
+bool RLA::Parse( const SENTENCE& sentence )
+{
+//   ASSERT_VALID( this );
 
-      LATLONG          OwnshipPosition;
-      double           OwnshipHeading;
 
-      double           TimeStamp;
+   /*
+   ** RLA - Ropeless Fishing Release Message A
+   **
+   **  Version 1.0 Format
+   **
+   **        1    2    3
+   **        |    |    |
+   ** $--RLA,cccc,ssss*hh<CR><LF>
+   **
+   ** Field Number:
+   **  1) Transponder Code
+   **  2) TransponderStatus
+   **  3) Checksum
+   */
 
-      int              TransponderCode;
-      int              TransponderPartner;
-      LATLONG          TransponderPosition;
-      double           TransponderRange;
-      double           TransponderBearing;
+   /*
+   ** First we check the checksum...
+   */
 
-      /*
-      ** Methods
-      */
+   int nFields = sentence.GetNumberOfDataFields( );
 
-      virtual void Empty( void );
-      virtual bool Parse( const SENTENCE& sentence );
-      virtual bool Write( SENTENCE& sentence );
+   NMEA0183_BOOLEAN check = sentence.IsChecksumBad( nFields + 1 );
 
-      /*
-      ** Operators
-      */
+   if ( check == NTrue )
+   {
+       return( FALSE );
+   }
 
-      virtual const RFA& operator = ( const RFA& source );
-};
+   TransponderCode = sentence.Integer(1);
+   TransponderStatus = sentence.Integer(2);
 
-#endif // RMC_CLASS_HEADER
+
+   return( TRUE );
+}
+
+bool RLA::Write( SENTENCE& sentence )
+{
+//   ASSERT_VALID( this );
+
+   /*
+   ** Let the parent do its thing
+   */
+
+   RESPONSE::Write( sentence );
+#if 0
+   sentence += UTCTime;
+   sentence += IsDataValid;
+   sentence += Position;
+   sentence += SpeedOverGroundKnots;
+   sentence += TrackMadeGoodDegreesTrue;
+   sentence += Date;
+   sentence += MagneticVariation;
+   sentence += MagneticVariationDirection;
+
+   sentence.Finish();
+#endif
+   return( TRUE );
+}
+
+const RLA& RLA::operator = ( const RLA& source )
+{
+//   ASSERT_VALID( this );
+#if 0
+   UTCTime                    = source.UTCTime;
+   IsDataValid                = source.IsDataValid;
+   Position                   = source.Position;
+   SpeedOverGroundKnots       = source.SpeedOverGroundKnots;
+   TrackMadeGoodDegreesTrue   = source.TrackMadeGoodDegreesTrue;
+   Date                       = source.Date;
+   MagneticVariation          = source.MagneticVariation;
+   MagneticVariationDirection = source.MagneticVariationDirection;
+#endif
+
+  return( *this );
+}
