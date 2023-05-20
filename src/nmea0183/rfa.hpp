@@ -62,6 +62,12 @@ class RFA : public RESPONSE
       LATLONG          TransponderPosition;
       double           TransponderRange;
       double           TransponderBearing;
+      double           TransponderDepth;
+      double           TransponderTemp;
+      int              TransponderBattStat;
+      wxString         TransponderMFG;
+
+
 
       /*
       ** Methods

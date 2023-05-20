@@ -43,7 +43,7 @@
 
 class LATLONG;
 
-class SENTENCE 
+class SENTENCE
 {
 //   DECLARE_DYNAMIC( SENTENCE )
 
@@ -67,7 +67,7 @@ class SENTENCE
       virtual COMMUNICATIONS_MODE CommunicationsMode( int field_number ) const;
       virtual double Double( int field_number ) const;
       virtual EASTWEST EastOrWest( int field_number ) const;
-      virtual const wxString& Field( int field_number ) const;
+      virtual wxString Field( int field_number ) const;
       virtual void Finish( void );
       virtual int GetNumberOfDataFields( void ) const;
       virtual int Integer( int field_number ) const;
@@ -81,7 +81,7 @@ class SENTENCE
       ** Operators
       */
 
-      operator wxString() const; 
+      operator wxString() const;
       virtual const SENTENCE& operator  = ( const SENTENCE& source );
       virtual const SENTENCE& operator  = ( const wxString& source );
       virtual const SENTENCE& operator += ( const wxString& source );
@@ -94,5 +94,5 @@ class SENTENCE
       virtual const SENTENCE& operator += ( NMEA0183_BOOLEAN boolean );
       virtual const SENTENCE& operator += ( LATLONG& source );
 };
- 
+
 #endif // SENTENCE_CLASS_HEADER

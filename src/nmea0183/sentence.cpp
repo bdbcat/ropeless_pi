@@ -182,7 +182,7 @@ EASTWEST SENTENCE::EastOrWest( int field_number ) const
    }
 }
 
-const wxString& SENTENCE::Field( int desired_field_number ) const
+wxString SENTENCE::Field( int desired_field_number ) const
 {
 //   ASSERT_VALID( this );
 
