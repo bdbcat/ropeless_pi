@@ -93,7 +93,11 @@ enum {
   tlICON = 0,
   tlIDENT,
   tlTIMESTAMP,
-  tlRELEASE_STATUS
+  tlRELEASE_STATUS,
+  tlDISTANCE,
+  tlPINGS,
+  tlDEPTH,
+  tlTEMP
 };  // Transponder list Columns;
 
 //----------------------------------------------------------------------------------------------------------
@@ -133,7 +137,16 @@ public:
 
 class transponder_state {
 public:
-  transponder_state(){ release_status = -2;};
+  transponder_state(){
+    release_status = -2;
+    range = 0;
+    bearing = 0;
+    depth = 0;
+    temp = 0;
+    timeStamp = 0;
+    batt_stat = 0;
+    }
+
   ~transponder_state(){};
 
   int ident;
@@ -143,6 +156,11 @@ public:
   double predicted_lat;
   double predicted_lon;
   int release_status;
+  double range;
+  double bearing;
+  double depth;
+  double temp;
+  int batt_stat;
   std::deque<transponder_state_history *> historyQ;
 
 };
@@ -208,9 +226,6 @@ public:
       bool                m_bsec_thread_active;
       int                 m_Thread_run_flag;
 
-//      void ProcessTenderFix( void );
-
-      std::vector<transponder_state *>transponderStatus;
 
       void startSim();
       void stopSim();
@@ -436,6 +451,7 @@ public:
     void OnStopSimButton(wxCommandEvent &event);
     void OnStartSimButton(wxCommandEvent &event);
     void RefreshTransponderList();
+    void OnTargetListColumnClicked(wxListEvent &event);
 
 
     DECLARE_EVENT_TABLE()

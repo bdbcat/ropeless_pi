@@ -85,6 +85,11 @@ int                     gGPS_Watchdog;
 
 ropeless_pi             *g_ropelessPI;
 
+bool                    g_bRopelessTargetList_sortReverse;
+int                     g_RopelessTargetList_sortColumn;
+std::vector<transponder_state *>transponderStatus;
+
+
 #include <wx/arrimpl.cpp> // this is a magic incantation which must be done!
 WX_DEFINE_OBJARRAY(ArrayOf2DPoints);
 
@@ -99,7 +104,8 @@ wxString colorTableNames[] = {
 };
 #define COLOR_TABLE_COUNT 5
 
-wxString msgFileName = "/home/dsr/RFA01132022.txt"; //"/home/dsr/Projects/ropeless_pi/testset1.txt";
+wxString msgFileName = "/home/dsr/Projects/ropeless_pi/NMEArevC_06072023.txt";
+  //"/home/dsr/RFA01132022.txt"; //"/home/dsr/Projects/ropeless_pi/testset1.txt";
 
 wxDateTime DaysTowDT( double days )
 {
@@ -205,6 +211,58 @@ void Clone_VP(PlugIn_ViewPort *dest, PlugIn_ViewPort *src)
 
     dest->bValid =                 src->bValid;                 // This VP is valid
 }
+
+static int CompareD(double a, double b) {
+    if (g_bRopelessTargetList_sortReverse) {
+        if (a > b)
+          return 1;
+        else if (a < b)
+          return -1;
+        else
+          return 0;
+    } else {
+        if (a > b)
+          return -1;
+        else if (a < b)
+          return 1;
+        else
+          return 0;
+    }
+    return 0;
+
+}
+
+static int wxCALLBACK wxListCompareFunction(wxIntPtr item1, wxIntPtr item2, wxIntPtr sortData) {
+  std::vector<transponder_state *> *v = &transponderStatus; //reinterpret_cast<std::vector<transponder_state *>*>(sortData);
+
+  auto tS1 = (*v)[static_cast<size_t>(item1)];
+  auto tS2 = (*v)[static_cast<size_t>(item2)];
+
+  switch(g_RopelessTargetList_sortColumn){
+    case tlDISTANCE:
+      return(CompareD(tS2->range, tS1->range));
+      break;
+
+    case tlTIMESTAMP: {
+      return(CompareD(tS2->timeStamp, tS1->timeStamp));
+      break;
+    }
+
+    case tlIDENT:
+      return(CompareD((double)tS2->ident, (double)tS1->ident));
+      break;
+
+
+    case tlICON:
+    case tlRELEASE_STATUS:
+    case tlPINGS:
+    case tlDEPTH:
+    case tlTEMP:
+    default:
+      return 0;
+  }
+}
+
 //---------------------------------------------------------------------------------------------------------
 //
 //          PlugIn initialization and de-init
@@ -266,6 +324,8 @@ int ropeless_pi::Init( void )
     m_tenderGPS_x  = 2.6;               // stbd from midships
     m_tenderLength = 41.1;
     m_tenderWidth = 10.7;
+
+    m_NMEA0183.TalkerID = _T ( "RF" );
 
 //     Length = 41.1
 //     Beam = 10.7
@@ -889,7 +949,7 @@ void ropeless_pi::LoadTransponderStatus()
       pugi::xml_node transponderRoot = transponderStatusXML.first_child();
 
       if (!parseTransponderNode(transponderRoot, &state)) {
-        OCPNMessageBox_PlugIn(GetOCPNCanvasWindow(), _("Error processing Ropless Transponder status (XML) file."),
+        OCPNMessageBox_PlugIn(GetOCPNCanvasWindow(), _("Error processing Ropeless Transponder status (XML) file."),
                        _("OpenCPN Ropeless Plugin Error"));
         return;
       }
@@ -1134,9 +1194,35 @@ void ropeless_pi::ProcessRFACapture( void )
     this_transponder_state->predicted_lon = -this_transponder_state->predicted_lon;
 
 
+  this_transponder_state->range = m_NMEA0183.Rfa.TransponderRange;
+  this_transponder_state->bearing = m_NMEA0183.Rfa.TransponderBearing;
+  this_transponder_state->depth = m_NMEA0183.Rfa.TransponderDepth;
+  this_transponder_state->temp = m_NMEA0183.Rfa.TransponderTemp;
+  this_transponder_state->batt_stat = m_NMEA0183.Rfa.TransponderBattStat;
+
+  //  Capture ownship position/COG
+  double ownship_lat = m_NMEA0183.Rfa.OwnshipPosition.Latitude.Latitude;
+  double ownship_lon = m_NMEA0183.Rfa.OwnshipPosition.Longitude.Longitude;
+  double ownship_cog = m_NMEA0183.Rfa.OwnshipHeading;
+
   if(m_pRLDialog){
     m_pRLDialog->RefreshTransponderList();
   }
+
+  // Synthesize a RMC message, and send it upstream
+
+  m_NMEA0183.Rmc.IsDataValid = NTrue;
+  m_NMEA0183.Rmc.SpeedOverGroundKnots = 1.0;
+  m_NMEA0183.Rmc.Position.Latitude.Set(ownship_lat);
+  m_NMEA0183.Rmc.Position.Longitude.Set(-ownship_lon);
+  m_NMEA0183.Rmc.TrackMadeGoodDegreesTrue = ownship_cog;
+  m_NMEA0183.Rmc.Date.Empty();
+  m_NMEA0183.Rmc.MagneticVariation = 0.0;
+  m_NMEA0183.Rmc.MagneticVariationDirection = EW_Unknown;
+
+  SENTENCE rmc_sentence;
+  m_NMEA0183.Rmc.Write( rmc_sentence );
+  PushNMEABuffer(rmc_sentence.Sentence);
 }
 
 
@@ -1663,6 +1749,15 @@ RopelessDialog::RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi,
         m_pListCtrlTranponders = new OCPNListCtrl(this, ID_TRANSPONDER_LIST, wxDefaultPosition, wxDefaultSize, flags);
         bSizer2->Add(m_pListCtrlTranponders, 1, wxEXPAND | wxALL, 0);
 
+//         m_pListCtrlTranponders->Connect(
+//             wxEVT_COMMAND_LIST_ITEM_SELECTED,
+//             wxListEventHandler(RopelessDialog::OnTargetSelected), NULL, this);
+
+        m_pListCtrlTranponders->Connect(
+            wxEVT_COMMAND_LIST_COL_CLICK,
+            wxListEventHandler(RopelessDialog::OnTargetListColumnClicked), NULL,
+            this);
+
         int dx = GetCharWidth();
 
         int colWidth = dx * 6;
@@ -1676,6 +1771,19 @@ RopelessDialog::RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi,
 
         colWidth = dx * 18;
         m_pListCtrlTranponders->InsertColumn(tlTIMESTAMP, _("LastReportTime (UTC)"), wxLIST_FORMAT_LEFT, colWidth);
+
+        colWidth = dx * 18;
+        m_pListCtrlTranponders->InsertColumn(tlDISTANCE, _("Distance, M"), wxLIST_FORMAT_LEFT, colWidth);
+
+        colWidth = dx * 18;
+        m_pListCtrlTranponders->InsertColumn(tlDEPTH, _("Depth, M"), wxLIST_FORMAT_LEFT, colWidth);
+
+        colWidth = dx * 18;
+        m_pListCtrlTranponders->InsertColumn(tlPINGS, _("Pings"), wxLIST_FORMAT_LEFT, colWidth);
+
+        colWidth = dx * 18;
+        m_pListCtrlTranponders->InsertColumn(tlTEMP, _("Temperature, C"), wxLIST_FORMAT_LEFT, colWidth);
+
 
         // Build the color indicator bitmaps, adding to an image lst
         int imageRefSize = dx * 2;
@@ -1797,61 +1905,7 @@ RopelessDialog::RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi,
         }
 #endif
 
-#if 0
-        // Icon parameters
-        wxStaticBoxSizer* sbSizerDimensions = new wxStaticBoxSizer( new wxStaticBox( this, wxID_ANY, _("Tender Dimensions") ), wxVERTICAL );
-        bSizer2->Add( sbSizerDimensions, 1, wxALL|wxEXPAND, 5 );
 
-        wxFlexGridSizer *realSizes = new wxFlexGridSizer(5, 2, 4, 4);
-        realSizes->AddGrowableCol(1);
-
-        sbSizerDimensions->Add(realSizes, 0, wxEXPAND | wxLEFT, 30);
-
-        realSizes->Add( new wxStaticText(this, wxID_ANY, _("Length Over All (m)")), 1, wxALIGN_LEFT);
-        m_pTenderLength = new wxTextCtrl(this, 1);
-        realSizes->Add(m_pTenderLength, 1, wxALIGN_RIGHT | wxALL, 4);
-
-        realSizes->Add( new wxStaticText(this, wxID_ANY, _("Width Over All (m)")), 1, wxALIGN_LEFT);
-        m_pTenderWidth = new wxTextCtrl(this, wxID_ANY);
-        realSizes->Add(m_pTenderWidth, 1, wxALIGN_RIGHT | wxALL, 4);
-
-        realSizes->Add( new wxStaticText(this, wxID_ANY, _("GPS Offset from Bow (m)")),1, wxALIGN_LEFT);
-        m_pTenderGPSOffsetY = new wxTextCtrl(this, wxID_ANY);
-        realSizes->Add(m_pTenderGPSOffsetY, 1, wxALIGN_RIGHT | wxALL, 4);
-
-        realSizes->Add(new wxStaticText(this, wxID_ANY, _("GPS Offset from Midship (m)")), 1, wxALIGN_LEFT);
-        m_pTenderGPSOffsetX = new wxTextCtrl(this, wxID_ANY);
-        realSizes->Add(m_pTenderGPSOffsetX, 1, wxALIGN_RIGHT | wxALL, 4);
-#endif
-
- /*
-        wxString m_rbViewTypeChoices[] = { _("Extended"), _("Variation only") };
-        int m_rbViewTypeNChoices = sizeof( m_rbViewTypeChoices ) / sizeof( wxString );
-        m_rbViewType = new wxRadioBox( this, wxID_ANY, _("View"), wxDefaultPosition, wxDefaultSize, m_rbViewTypeNChoices, m_rbViewTypeChoices, 2, wxRA_SPECIFY_COLS );
-        m_rbViewType->SetSelection( 1 );
-        bSizer2->Add( m_rbViewType, 0, wxALL|wxEXPAND, 5 );
-
-        m_cbShowPlotOptions = new wxCheckBox( this, wxID_ANY, _("Show Plot Options"), wxDefaultPosition, wxDefaultSize, 0 );
-        bSizer2->Add( m_cbShowPlotOptions, 0, wxALL, 5 );
-
-        m_cbShowAtCursor = new wxCheckBox( this, wxID_ANY, _("Show also data at cursor position"), wxDefaultPosition, wxDefaultSize, 0 );
-        bSizer2->Add( m_cbShowAtCursor, 0, wxALL, 5 );
-
-        m_cbShowIcon = new wxCheckBox( this, wxID_ANY, _("Show toolbar icon"), wxDefaultPosition, wxDefaultSize, 0 );
-        bSizer2->Add( m_cbShowIcon, 0, wxALL, 5 );
-
-        m_cbLiveIcon = new wxCheckBox( this, wxID_ANY, _("Show data in toolbar icon"), wxDefaultPosition, wxDefaultSize, 0 );
-        bSizer2->Add( m_cbLiveIcon, 0, wxALL, 5 );
-
-        wxStaticBoxSizer* sbSizer4;
-        sbSizer4 = new wxStaticBoxSizer( new wxStaticBox( this, wxID_ANY, _("Window transparency") ), wxVERTICAL );
-
-        m_sOpacity = new wxSlider( this, wxID_ANY, 255, 0, 255, wxDefaultPosition, wxDefaultSize, wxSL_HORIZONTAL|wxSL_INVERSE );
-        sbSizer4->Add( m_sOpacity, 0, wxBOTTOM|wxEXPAND|wxTOP, 5 );
-
-
-        bSizer2->Add( sbSizer4, 1, wxALL|wxEXPAND, 5 );
-*/
 
         m_sdbSizer1 = new wxStdDialogButtonSizer();
         m_sdbSizer1OK = new wxButton( this, wxID_OK );
@@ -1875,48 +1929,110 @@ RopelessDialog::~RopelessDialog()
         //delete m_pSerialArray;
 }
 
+void RopelessDialog::OnTargetListColumnClicked(wxListEvent &event) {
+  int key = event.GetColumn();
+  wxListItem item;
+  //item.SetMask(wxLIST_MASK_IMAGE);
+  if (key == g_RopelessTargetList_sortColumn)
+    g_bRopelessTargetList_sortReverse = !g_bRopelessTargetList_sortReverse;
+  else {
+    //item.SetImage(-1);
+    //m_pListCtrlAISTargets->SetColumn(g_AisTargetList_sortColumn, item);
+    g_bRopelessTargetList_sortReverse = false;
+    g_RopelessTargetList_sortColumn = key;
+  }
+  //item.SetImage(g_bAisTargetList_sortReverse ? 1 : 0);
+
+  //if (!g_bAisTargetList_autosort) g_bsort_once = true;
+
+//  if (g_RopelessTargetList_sortColumn >= 0) {
+    //m_pListCtrlAISTargets->SetColumn(g_AisTargetList_sortColumn, item);
+    RefreshTransponderList();
+//  }
+}
+
+
 void RopelessDialog::RefreshTransponderList()
 {
   m_pListCtrlTranponders->DeleteAllItems();
 
       //  Walk the vector of transponder status
-  for (unsigned int i = 0 ; i < pParentPi->transponderStatus.size() ; i++){
-    transponder_state *state = pParentPi->transponderStatus[i];
+  for (unsigned int i = 0 ; i < transponderStatus.size() ; i++){
+    transponder_state *state = transponderStatus[i];
 
     wxListItem item;
     item.SetId(i);
-    m_pListCtrlTranponders->InsertItem(item);
+    //long result = m_pListCtrlTranponders->InsertItem(item);
+    long result = m_pListCtrlTranponders->InsertItem(i, " ");
+
+    m_pListCtrlTranponders->SetItemData(result, (long)i);
 
     item.SetColumn(tlICON);
     m_pListCtrlTranponders->SetItemImage(item, state->color_index);
 
 
-    item.SetColumn(tlIDENT);
+    //item.SetColumn(tlIDENT);
     wxString sid;
     sid.Printf("%d", state->ident);
-    item.SetText(sid);
-    m_pListCtrlTranponders->SetItem(item);
+    //item.SetText(sid);
+    //m_pListCtrlTranponders->SetItem(item);
+    m_pListCtrlTranponders->SetItem(result, tlIDENT, sid);
 
-    item.SetColumn(tlRELEASE_STATUS);
+    //item.SetColumn(tlRELEASE_STATUS);
     wxString srs;
     if (state->release_status == -2)
       sid = "---";
     else
       sid.Printf("%d", state->release_status);
-    item.SetText(sid);
-    m_pListCtrlTranponders->SetItem(item);
+    //item.SetText(sid);
+    //m_pListCtrlTranponders->SetItem(item);
+    m_pListCtrlTranponders->SetItem(result, tlRELEASE_STATUS, sid);
 
-    item.SetColumn(tlTIMESTAMP);
+    //item.SetColumn(tlTIMESTAMP);
     wxString sts;
     //wxDateTime ts = DaysTowDT(state->timeStamp);
     wxDateTime ts((time_t)(state->timeStamp));
     ts.MakeUTC();
     sts = ts.FormatISOCombined(' ');
     //sts.Printf("%g", state->timeStamp);
-    item.SetText(sts);
-    m_pListCtrlTranponders->SetItem(item);
+    //item.SetText(sts);
+    //m_pListCtrlTranponders->SetItem(item);
+    m_pListCtrlTranponders->SetItem(result, tlTIMESTAMP, sts);
+
+    //item.SetColumn(tlDEPTH);
+    wxString sdp;
+    sdp.Printf("%g", state->depth);
+    //item.SetText(sdp);
+    //m_pListCtrlTranponders->SetItem(item);
+    m_pListCtrlTranponders->SetItem(result, tlDEPTH, sdp);
+
+    //item.SetColumn(tlTEMP);
+    wxString stemp;
+    stemp.Printf("%g", state->temp);
+    //item.SetText(stemp);
+    //m_pListCtrlTranponders->SetItem(item);
+    m_pListCtrlTranponders->SetItem(result, tlTEMP, stemp);
+
+    //item.SetColumn(tlPINGS);
+    wxString sping;
+    sping.Printf("%d", state->batt_stat);
+    //item.SetText(sping);
+    //m_pListCtrlTranponders->SetItem(item);
+    m_pListCtrlTranponders->SetItem(result, tlPINGS, sping);
+
+    //item.SetColumn(tlDISTANCE);
+    wxString sdist;
+    sdist.Printf("%g", state->range);
+    //item.SetText(sdist);
+    //m_pListCtrlTranponders->SetItem(item);
+    m_pListCtrlTranponders->SetItem(result, tlDISTANCE, sdist);
 
   }
+
+  if (g_RopelessTargetList_sortColumn > 0)
+    m_pListCtrlTranponders->SortItems(wxListCompareFunction,
+                reinterpret_cast<wxIntPtr>(&transponderStatus));
+
 #ifdef __WXMSW__
     m_pListCtrlTranponders->Refresh(false);
 #endif
