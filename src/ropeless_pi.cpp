@@ -29,6 +29,7 @@
 #endif //precompiled headers
 #include <typeinfo>
 #include <wx/graphics.h>
+#include <wx/numdlg.h>
 
 #include "config.h"
 #include "ropeless_pi.h"
@@ -618,15 +619,22 @@ void ropeless_pi::PopupMenuHandler( wxCommandEvent& event )
 
         case ID_TPR_RELEASE:
         {
-          wxString msg("Send Release command to transponder IDENT: \n\n");
+          wxString msg("Send Release command to transponder IDENT: \n");
           wxString msg1;
-          msg1.Printf("%d\n\n", m_foundState->ident);
+          msg1.Printf("%d\n", g_ropelessPI->m_foundState->ident);
           msg += msg1;
-          int ret = OCPNMessageBox_PlugIn(NULL, msg, _("ropeless_pi Message"), wxYES_NO);
 
-          if(ret == wxID_YES){
-            SendReleaseMessage(m_foundState);
-          }
+          //int ret = OCPNMessageBox_PlugIn(NULL, msg, _("ropeless_pi Message"), wxYES_NO);
+          //if(ret == wxID_YES)
+          //  SendReleaseMessage(m_foundState);
+
+          long result = wxGetNumberFromUser( msg,
+                            "Enter Release Code",
+                            "Ropeless Plugin Message",
+                            0, 0, 100000);
+
+          if (result > 0)
+            SendReleaseMessage(g_ropelessPI->m_foundState, result);
 
           handled = true;
           break;
@@ -692,7 +700,7 @@ unsigned char ropeless_pi::ComputeChecksum( wxString msg )
 }
 
 
-bool ropeless_pi::SendReleaseMessage(transponder_state *state)
+bool ropeless_pi::SendReleaseMessage(transponder_state *state, long code)
 {
   bool ret = true;
 
@@ -1408,8 +1416,8 @@ bool ropeless_pi::MouseEventHook( wxMouseEvent &event )
     GetCanvasLLPix( &g_ovp, mp, &m_cursor_lat, &m_cursor_lon);
 
     m_foundState = NULL;
-    //  On button push, find any transponders
-    if( event.RightDown() || event.LeftDown()) {
+    //  On right button push, find any transponders
+    if( event.RightDown()) {
 
 
       for (unsigned int i = 0 ; i < transponderStatus.size() ; i++){
@@ -1423,33 +1431,6 @@ bool ropeless_pi::MouseEventHook( wxMouseEvent &event )
           break;
         }
       }
-
-
-
-//        m_pFind = m_select->FindSelection( m_cursor_lat, m_cursor_lon, SELTYPE_POINT_GENERIC );
-
-//        if(m_pFind){
-#if 0
-            for(unsigned int i=0 ; i < m_brg_array.GetCount() ; i++){
-                brg_line *pb = m_brg_array.Item(i);
-
-                if(m_pFind->m_pData1 == pb){
-                    m_sel_brg = pb;
-                    m_sel_part = m_pFind->GetUserData();
-                    if(SEL_POINT_A == m_sel_part){
-                        m_sel_pt_lat = pb->GetLatA();
-                        m_sel_pt_lon = pb->GetLonA();
-                    }
-                    else {
-                        m_sel_pt_lat = pb->GetLatB();
-                        m_sel_pt_lon = pb->GetLonB();
-                    }
-
-                    break;
-                }
-            }
-#endif
-//        }
     }
 
 
@@ -1458,62 +1439,29 @@ bool ropeless_pi::MouseEventHook( wxMouseEvent &event )
 
         if( 1/*m_sel_brg || m_bshow_fix_hat*/){
 
-            wxMenu* contextMenu = new wxMenu;
-
-            wxMenuItem *release_item = 0;
 
             if(m_foundState){
+                wxMenu* contextMenu = new wxMenu;
+
+                wxMenuItem *release_item = 0;
                 release_item = new wxMenuItem(contextMenu, ID_TPR_RELEASE, _("Release Transponder") );
                 contextMenu->Append(release_item);
                 GetOCPNCanvasWindow()->Connect( ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
                                                 wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, this );
-            }
-
-//             if(!m_bshow_fix_hat && m_sel_brg){
-//                 brg_item = new wxMenuItem(contextMenu, ID_EPL_DELETE, _("Delete Bearing") );
-//                 contextMenu->Append(brg_item);
-//                 GetOCPNCanvasWindow()->Connect( ID_EPL_DELETE, wxEVT_COMMAND_MENU_SELECTED,
-//                                                 wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, this );
-//             }
-
-//             if(m_bshow_fix_hat){
-//                 wxMenuItem *fix_item = new wxMenuItem(contextMenu, ID_EPL_XMIT, _("Send sighted fix to device") );
-//                 contextMenu->Append(fix_item);
-//                 GetOCPNCanvasWindow()->Connect( ID_EPL_XMIT, wxEVT_COMMAND_MENU_SELECTED,
-//                                                 wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, this );
-//             }
 
             //   Invoke the drop-down menu
-            GetOCPNCanvasWindow()->PopupMenu( contextMenu, m_mouse_x, m_mouse_y );
+                GetOCPNCanvasWindow()->PopupMenu( contextMenu, m_mouse_x, m_mouse_y );
 
-            if(release_item){
-                GetOCPNCanvasWindow()->Disconnect( ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
+                if(release_item){
+                    GetOCPNCanvasWindow()->Disconnect( ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
                                                    wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, this );
+                }
+
+
+                bret = true;                // I have eaten this event
             }
-
-//             if(fix_item){
-//                 GetOCPNCanvasWindow()->Connect( ID_EPL_XMIT, wxEVT_COMMAND_MENU_SELECTED,
-//                                                 wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, this );
-//             }
-
-            bret = true;                // I have eaten this event
         }
-
     }
-
-    else if( event.LeftDown() ) {
-    }
-
-//     if( event.LeftUp() ) {
-//         if(m_sel_brg)
-//             bret = true;
-//
-//         m_pFind = NULL;
-//         m_sel_brg = NULL;
-//
-//         m_nfix = CalculateFix();
-//
-//     }
 
     return bret;
 }
@@ -1728,6 +1676,7 @@ void PI_EventHandler::OnEvtOCPN_NMEA( PI_OCPN_DataStreamEvent& event )
 BEGIN_EVENT_TABLE( RopelessDialog, wxDialog )
 EVT_BUTTON( wxID_OK, RopelessDialog::OnOkClick )
 EVT_CLOSE(RopelessDialog::OnClose)
+//EVT_LIST_ITEM_RIGHT_CLICK(wxID_ANY,RopelessDialog::OnTargetRightClick)
 END_EVENT_TABLE()
 
 RopelessDialog::RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi,
@@ -1749,9 +1698,9 @@ RopelessDialog::RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi,
         m_pListCtrlTranponders = new OCPNListCtrl(this, ID_TRANSPONDER_LIST, wxDefaultPosition, wxDefaultSize, flags);
         bSizer2->Add(m_pListCtrlTranponders, 1, wxEXPAND | wxALL, 0);
 
-//         m_pListCtrlTranponders->Connect(
-//             wxEVT_COMMAND_LIST_ITEM_SELECTED,
-//             wxListEventHandler(RopelessDialog::OnTargetSelected), NULL, this);
+         m_pListCtrlTranponders->Connect(
+              wxEVT_COMMAND_LIST_ITEM_RIGHT_CLICK,
+              wxListEventHandler(RopelessDialog::OnTargetRightClick), NULL, this);
 
         m_pListCtrlTranponders->Connect(
             wxEVT_COMMAND_LIST_COL_CLICK,
@@ -1927,6 +1876,48 @@ RopelessDialog::RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi,
 RopelessDialog::~RopelessDialog()
 {
         //delete m_pSerialArray;
+}
+
+void RopelessDialog::OnTargetRightClick(wxListEvent &event) {
+  int mouseX;
+  int mouseY;
+  long index = -1;
+
+  if (m_pListCtrlTranponders->GetItemCount()){
+    wxListItem item;
+    item.SetId(0);
+    wxRect rect;
+    m_pListCtrlTranponders->GetItemRect(item, rect);
+
+    const wxPoint pt = wxGetMousePosition();
+    mouseX = pt.x - m_pListCtrlTranponders->GetScreenPosition().x;
+    mouseY = pt.y - m_pListCtrlTranponders->GetScreenPosition().y;
+    mouseY -= rect.y;
+
+    int flags;
+    index = m_pListCtrlTranponders->HitTest(wxPoint(mouseX, mouseY),
+              flags);
+
+      if( index >= 0 ) {
+
+        g_ropelessPI->m_foundState = transponderStatus[index];
+
+        wxMenu* contextMenu = new wxMenu;
+        wxMenuItem *release_item = 0;
+
+        release_item = new wxMenuItem(contextMenu, ID_TPR_RELEASE, _("Release Transponder") );
+        contextMenu->Append(release_item);
+        GetOCPNCanvasWindow()->Connect( ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
+                                                wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, this );
+
+        //   Invoke the drop-down menu
+        GetOCPNCanvasWindow()->PopupMenu( contextMenu, wxGetMousePosition().x, wxGetMousePosition().y );
+
+        if(release_item)
+          GetOCPNCanvasWindow()->Disconnect( ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
+                                         wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, this );
+    }
+  }
 }
 
 void RopelessDialog::OnTargetListColumnClicked(wxListEvent &event) {

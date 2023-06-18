@@ -237,6 +237,7 @@ public:
 
      wxTimer m_simulatorTimer;
      int m_start_sim_id, m_stop_sim_id;
+     transponder_state      *m_foundState;
 
 
 private:
@@ -259,7 +260,7 @@ private:
       bool parseTransponderNode(pugi::xml_node &transponderNode,
                             transponder_state *state);
 
-      bool SendReleaseMessage(transponder_state *state);
+      bool SendReleaseMessage(transponder_state *state, long code);
       unsigned char ComputeChecksum( wxString msg );
 
 //      int CalculateFix( void );
@@ -365,7 +366,6 @@ private:
      RopelessDialog         *m_pRLDialog;
      wxWindow               *m_parent_window;
      double                 m_selectRadius;
-     transponder_state      *m_foundState;
 
      wxSocketBase*          m_tsock;
      wxIPV4address          m_tconn_addr;
@@ -452,7 +452,7 @@ public:
     void OnStartSimButton(wxCommandEvent &event);
     void RefreshTransponderList();
     void OnTargetListColumnClicked(wxListEvent &event);
-
+    void OnTargetRightClick(wxListEvent &event);
 
     DECLARE_EVENT_TABLE()
 
