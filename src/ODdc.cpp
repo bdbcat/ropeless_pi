@@ -36,14 +36,14 @@
 #include <windows.h>
 #endif
 
-#ifdef USE_ANDROID_GLES2
-#include "ODShaders.h"
-#include <GLES2/gl2.h>
-#include "linmath.h"
+#ifdef ocpnUSE_GL
+#include "dychart.h"
+#include <wx/glcanvas.h>
 #endif
 
-#ifdef ocpnUSE_GL
-#include <wx/glcanvas.h>
+#ifdef USE_ANDROID_GLES2
+#include "ODShaders.h"
+#include "linmath.h"
 #endif
 
 #include <wx/graphics.h>
