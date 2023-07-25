@@ -175,7 +175,7 @@
 #if defined(__ANDROID__)
  //#include <GLES2/gl2.h>
  #include <qopengl.h>
- #include <GL/gl_private.h>  // this is a cut-down version of gl.h
+ #include "GL/gl_private.h"  // this is a cut-down version of gl.h
  #include <GLES2/gl2.h>
 #elif defined(_WIN32)
  #include "glew.h"
