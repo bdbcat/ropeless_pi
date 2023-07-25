@@ -26,8 +26,9 @@
 #ifdef ocpnUSE_GL
 
 #include <wx/wx.h>
-#include "GL/gl.h"
-#include "GL/glu.h"
+//#include "GL/gl.h"
+//#include "GL/glu.h"
+#include "dychart.h"
 
 #include "TexFont.h"
 
