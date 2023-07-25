@@ -142,7 +142,7 @@ set(SRC ${SRC_ROPELESS} ${SRC_NMEA0183})
 
 
 if(QT_ANDROID)
-  set(SRC ${SRC} src/androidSupport.cpp)
+#  set(SRC ${SRC} src/androidSupport.cpp)
 endif(QT_ANDROID)
 
 set(CMAKE_BUILD_TYPE Debug)
