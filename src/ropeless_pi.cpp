@@ -633,7 +633,7 @@ void ropeless_pi::PopupMenuHandler( wxCommandEvent& event )
                             "Ropeless Plugin Message",
                             0, 0, 100000);
 
-          if (result > 0)
+          if (result >= 0)
             SendReleaseMessage(g_ropelessPI->m_foundState, result);
 
           handled = true;
@@ -707,10 +707,10 @@ bool ropeless_pi::SendReleaseMessage(transponder_state *state, long code)
   // Create payload
   wxString payload("$RSRLB,");
   wxString pl1;
-  pl1.Printf("%d,0*", state->ident);
+  pl1.Printf("%d,%ld", state->ident, code);
   payload += pl1;
   unsigned char cs = ComputeChecksum(payload);
-  pl1.Printf("%02X", cs);
+  pl1.Printf("*%02X\r\n", cs);
   payload += pl1;
 
   // Create a UDP transmit socket
@@ -1268,6 +1268,7 @@ void ropeless_pi::SetNMEASentence( wxString &sentence )
     if (sentence.IsEmpty())
       return;
 
+ printf("%s\n", sentence.ToStdString().c_str());
     m_NMEA0183 << sentence;
 
     if( m_NMEA0183.PreParse() ) {
@@ -1908,14 +1909,14 @@ void RopelessDialog::OnTargetRightClick(wxListEvent &event) {
         release_item = new wxMenuItem(contextMenu, ID_TPR_RELEASE, _("Release Transponder") );
         contextMenu->Append(release_item);
         GetOCPNCanvasWindow()->Connect( ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
-                                                wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, this );
+                                                wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, pParentPi );
 
         //   Invoke the drop-down menu
         GetOCPNCanvasWindow()->PopupMenu( contextMenu, wxGetMousePosition().x, wxGetMousePosition().y );
 
         if(release_item)
           GetOCPNCanvasWindow()->Disconnect( ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
-                                         wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, this );
+                                         wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, pParentPi );
     }
   }
 }
