@@ -46,10 +46,12 @@
 #include <arpa/inet.h>
 #include <netinet/tcp.h>
 
-#ifdef ocpnUSE_GL
-#include <GL/gl.h>
-#include <GL/glu.h>
-#endif
+//#ifdef ocpnUSE_GL
+//#include <GL/gl.h>
+//#include <GL/glu.h>
+//#endif
+
+#include "dychart.h"
 
 #if !defined(NAN)
 static const long long lNaN = 0xfff8000000000000;
