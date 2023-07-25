@@ -34,7 +34,7 @@
 #include "glu_mangle.h"
 #endif
 
-#include "gl.h"
+#include "GL/gl.h"
 
 #ifndef GLAPIENTRY
 #define GLAPIENTRY
