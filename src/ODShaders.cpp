@@ -25,11 +25,8 @@
 #include "ODShaders.h"
 
 #include "linmath.h"
-
 #include "qdebug.h"
-
-#include <gl2.h>
-
+#include <GLES2/gl2.h>
 #include "wx/log.h"
 
 // Simple colored triangle shader
