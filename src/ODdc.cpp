@@ -57,7 +57,7 @@
 //#include "wx28compat.h"
 //#include "cutil.h"
 
-#include <GL/glu.h>
+#include "GL/glu.h"
 
 #define __CALL_CONVENTION
 
