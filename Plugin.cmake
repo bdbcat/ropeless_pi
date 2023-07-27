@@ -161,6 +161,9 @@ macro(late_init)
 endmacro ()
 
 macro(add_plugin_libraries)
+  add_subdirectory("opencpn-libs/opencpn-glu")
+  target_link_libraries(${PACKAGE_NAME} opencpn::glu)
+
   #add_subdirectory("libs/cpl")
   #target_link_libraries(${PACKAGE_NAME} ocpn::cpl)
 

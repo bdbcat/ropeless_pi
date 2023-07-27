@@ -186,7 +186,7 @@ static const GLchar* circle_filled_fragment_shader_source =
     
 bool pi_loadShaders()
 {
-   
+   qDebug() << "****************************LoadShaders";
     bool ret_val = true;
     GLint success;
 
@@ -462,7 +462,7 @@ bool pi_loadShaders()
     }
 #endif
 
-    //qDebug() << "pi_loadShaders: " << ret_val;
+    qDebug() << "*********************pi_loadShaders: " << ret_val;
     return ret_val;
 }
 

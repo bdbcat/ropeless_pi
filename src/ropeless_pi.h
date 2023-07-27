@@ -315,11 +315,11 @@ private:
       wxTimer              m_head_dog_timer;
 
 
-      int                  mPriPosition;
-      int                  mPriDateTime;
-      int                  mPriVar;
-      int                  mPriHeadingM;
-      int                  mPriHeadingT;
+   //   int                  mPriPosition;
+   //   int                  mPriDateTime;
+   //   int                  mPriVar;
+   //   int                  mPriHeadingM;
+   //   int                  mPriHeadingT;
 
       double               m_ownship_lat;
       double               m_ownship_lon;
@@ -328,34 +328,22 @@ private:
 
 
       //        Rollover Window support
-//      brg_line             *m_pRolloverBrg;
       RolloverWin          *m_pBrgRolloverWin;
       wxTimer               m_RolloverPopupTimer;
       int                   m_rollover_popup_timer_msec;
 
-      wxColour              m_FixHatColor;
+ //     wxColour              m_FixHatColor;
 
       PI_EventHandler       *m_event_handler;
       PI_OCP_DataStreamInput_Thread *m_serialThread;
       wxString              m_serialPort;
 
-     wxBitmap               m_tender_bmp;
      unsigned int           m_iconTexture;
      int                    m_texwidth, m_texheight;
 
      SelectItem             *m_tenderSelect;
      wxString               m_trackedWP;
      wxString               m_trackedWPGUID;
-
-     int                    m_tenderGPS_x;
-     int                    m_tenderGPS_y;
-     int                    m_tenderLength;
-     int                    m_tenderWidth;
-
-     wxString               m_tenderIconType;
-     PlugIn_Waypoint        m_TrackedWP;
-
-     RolloverWin            *m_pTrackRolloverWin;
 
      unsigned int           m_colorIndexNext;
 
@@ -443,7 +431,7 @@ public:
 
     RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi, wxWindowID id = wxID_ANY, const wxString& title = _("Ropeless"), const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxDefaultSize, long style = wxCAPTION|wxDEFAULT_DIALOG_STYLE );
     ~RopelessDialog();
-    void OnOkClick(wxCommandEvent& event);
+    void OnOKClick(wxCommandEvent& event);
 
     void OnClose(wxCloseEvent& event);
 

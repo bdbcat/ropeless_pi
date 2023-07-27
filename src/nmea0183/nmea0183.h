@@ -51,6 +51,7 @@
 #include "wx/list.h"
 #include "wx/arrstr.h"
 #include "wx/log.h"
+#include <cmath>
 
 /*
 ** Turn off the warning about precompiled headers, it is rather annoying

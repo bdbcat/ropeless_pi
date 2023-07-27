@@ -52,13 +52,28 @@
 //#endif
 
 #include "dychart.h"
+#include <sstream>
 
 #if !defined(NAN)
 static const long long lNaN = 0xfff8000000000000;
 #define NAN (*(double*)&lNaN)
 #endif
 
-//wxEventType wxEVT_PI_OCPN_DATASTREAM;// = wxNewEventType();
+
+
+#ifdef __ANDROID__
+
+char qtRLStyleSheet[] =
+"QScrollBar:horizontal {border: 0px solid grey; background-color: rgb(240, 240, 240); height: 20px; margin: 0px 1px 0 1px;}\
+QScrollBar::handle:horizontal {background-color: rgb(200, 200, 200); min-width: 20px; border-radius: 10px; }\
+QScrollBar::add-line:horizontal {border: 0px solid grey; background: #32CC99; width: 0px; subcontrol-position: right; subcontrol-origin: margin; }\
+QScrollBar::sub-line:horizontal {border: 0px solid grey; background: #32CC99; width: 0px; subcontrol-position: left; subcontrol-origin: margin; }\
+QScrollBar:vertical {border: 0px solid grey; background-color: rgb(240, 240, 240); width: 20px; margin: 1px 0px 1px 0px; }\
+QScrollBar::handle:vertical {background-color: rgb(200, 200, 200); min-height: 50px; border-radius: 10px; }\
+QScrollBar::add-line:vertical {border: 0px solid grey; background: #32CC99; height: 0px; subcontrol-position: top; subcontrol-origin: margin; }\
+QScrollBar::sub-line:vertical {border: 0px solid grey; background: #32CC99; height: 0px; subcontrol-position: bottom; subcontrol-origin: margin; }\
+";
+#endif
 
 #ifdef __WXMSW__
 wxEventType wxEVT_PI_OCPN_DATASTREAM = wxNewEventType();
@@ -292,6 +307,7 @@ ropeless_pi::~ropeless_pi( void )
 
 int ropeless_pi::Init( void )
 {
+
     AddLocaleCatalog( _T("opencpn-ropeless_pi") );
     m_config_version = -1;
 
@@ -302,11 +318,6 @@ int ropeless_pi::Init( void )
     mHDT_Watchdog = 2;
     mGPS_Watchdog = 2;
     mVar_Watchdog = 2;
-    mPriPosition = 9;
-    mPriDateTime = 9;
-    mPriVar = 9;
-    mPriHeadingM = 9;
-    mPriHeadingT = 9;
 
     gHDT_Watchdog = 10;
     gGPS_Watchdog = 10;
@@ -317,16 +328,10 @@ int ropeless_pi::Init( void )
     m_nfix = 0;
     m_bshow_fix_hat = false;
 
-    m_FixHatColor = wxColour(0, 128, 128);
     m_Thread_run_flag = -1;
 
     g_iconTypeArray.Add(_T("Scaled Vector Icon"));
     g_iconTypeArray.Add(_T("Generic Ship Icon"));
-
-    m_tenderGPS_y = 37.1;               // From bow
-    m_tenderGPS_x  = 2.6;               // stbd from midships
-    m_tenderLength = 41.1;
-    m_tenderWidth = 10.7;
 
     m_NMEA0183.TalkerID = _T ( "RF" );
 
@@ -339,7 +344,6 @@ int ropeless_pi::Init( void )
   //    Get a pointer to the opencpn display canvas, to use as a parent for the
   //    POI Manager dialog
     m_parent_window = GetOCPNCanvasWindow();
-
 
     gHdt = NAN;
     gHdm = NAN;
@@ -402,13 +406,13 @@ int ropeless_pi::Init( void )
 
     LoadTransponderStatus();    //Load persistant XML file
 
-    wxMenuItem *sim_item = new wxMenuItem(NULL, ID_PLAY_SIM, _("Start Ropeless Simulation") );
-    m_start_sim_id = AddCanvasContextMenuItem(sim_item, this );
-    SetCanvasContextMenuItemViz(m_start_sim_id, true);
+//    wxMenuItem *sim_item = new wxMenuItem(NULL, ID_PLAY_SIM, _("Start Ropeless Simulation") );
+//    m_start_sim_id = AddCanvasContextMenuItem(sim_item, this );
+//    SetCanvasContextMenuItemViz(m_start_sim_id, true);
 
-    wxMenuItem *sim_stop_item = new wxMenuItem(NULL, ID_STOP_SIM, _("Stop Simulation") );
-    m_stop_sim_id = AddCanvasContextMenuItem(sim_stop_item, this );
-    SetCanvasContextMenuItemViz(m_stop_sim_id, false);
+//    wxMenuItem *sim_stop_item = new wxMenuItem(NULL, ID_STOP_SIM, _("Stop Simulation") );
+//    m_stop_sim_id = AddCanvasContextMenuItem(sim_stop_item, this );
+//    SetCanvasContextMenuItemViz(m_stop_sim_id, false);
 
     //    This PlugIn needs a toolbar icon, so request its insertion
     m_leftclick_tool_id =
@@ -521,21 +525,23 @@ void ropeless_pi::OnToolbarToolCallback(int id) {
   m_pRLDialog->Layout();  // Some platforms need a re-Layout at this point
                            // (gtk, at least)
 
+#ifndef __ANDROID__
   if ((m_dialogSizeWidth > 0) && (m_dialogSizeHeight > 0))
       m_pRLDialog->SetSize(wxSize(m_dialogSizeWidth, m_dialogSizeHeight));
 
   if ((m_dialogPosX > 0) && (m_dialogPosY > 0))
       m_pRLDialog->Move(wxPoint(m_dialogPosX, m_dialogPosY));
+#else
+  wxSize parent_size = GetOCPNCanvasWindow()->GetSize();
+  m_pRLDialog->SetSize(wxSize(parent_size.x * 7 / 10, parent_size.y * 5 / 10));
+  m_pRLDialog->CentreOnScreen();
+  m_pRLDialog->Move(-1, 0);
+#endif
 
 
 //  wxPoint p = m_pRLDialog->GetPosition();
 //  m_pRLDialog->Move(0, 0);  // workaround for gtk autocentre dialog behavior
 //  m_pRLDialog->Move(p);
-
-#ifdef __OCPN__ANDROID__
-  m_pRLDialog->CentreOnScreen();
-  m_pRLDialog->Move(-1, 0);
-#endif
 
   m_pRLDialog->RefreshTransponderList();    //Pick up initial XML load
 }
@@ -630,10 +636,11 @@ void ropeless_pi::PopupMenuHandler( wxCommandEvent& event )
           //if(ret == wxID_YES)
           //  SendReleaseMessage(m_foundState);
 
-          long result = wxGetNumberFromUser( msg,
-                            "Enter Release Code",
-                            "Ropeless Plugin Message",
-                            0, 0, 100000);
+          long result = 1;
+          //long result = wxGetNumberFromUser( msg,
+          //                  "Enter Release Code",
+          //                  "Ropeless Plugin Message",
+          //                  0, 0, 100000);
 
           if (result >= 0)
             SendReleaseMessage(g_ropelessPI->m_foundState, result);
@@ -1338,31 +1345,6 @@ bool ropeless_pi::LoadConfig( void )
 
         m_trackedWP = getWaypointName(m_trackedWPGUID);
 
-        pConf->Read ( _T( "TenderLength" ),  &m_tenderLength );
-        pConf->Read ( _T( "TenderWidth" ),  &m_tenderWidth );
-        pConf->Read ( _T( "TenderGPSOffsetX" ),  &m_tenderGPS_x );
-        pConf->Read ( _T( "TenderGPSOffsetY" ),  &m_tenderGPS_y );
-
-        pConf->Read ( _T( "TenderIconType" ),  &m_tenderIconType );
-
-
-        // Qualify the input
-        m_tenderLength = wxMax(1, m_tenderLength);
-        m_tenderWidth = wxMax(1, m_tenderWidth);
-
-        bool bfound = false;
-        for(unsigned int i=0 ; i < g_iconTypeArray.Count() ; i++){
-            if(m_tenderIconType.IsSameAs(g_iconTypeArray.Item(i))){
-                bfound = true;
-                break;
-            }
-        }
-        if(!bfound)
-            m_tenderIconType = g_iconTypeArray.Item(0);
-
-
-        //setIcon( shippity );
-
         return true;
     } else
         return false;
@@ -1673,11 +1655,19 @@ void PI_EventHandler::OnEvtOCPN_NMEA( PI_OCPN_DataStreamEvent& event )
 #endif
 }
 
+void AdjustColumnWidth(OCPNListCtrl *list, int col){
+    int wh = list->GetColumnWidth(col);
+    //list->SetColumnWidth(col, wxLIST_AUTOSIZE );
+    list->SetColumnWidth(col, wh );
+//    int wc = list->GetColumnWidth(col);
+//    if (wh > wc)
+//        list->SetColumnWidth(col, wxLIST_AUTOSIZE_USEHEADER );
+}
 
 
 
 BEGIN_EVENT_TABLE( RopelessDialog, wxDialog )
-EVT_BUTTON( wxID_OK, RopelessDialog::OnOkClick )
+EVT_BUTTON( wxID_OK, RopelessDialog::OnOKClick )
 EVT_CLOSE(RopelessDialog::OnClose)
 //EVT_LIST_ITEM_RIGHT_CLICK(wxID_ANY,RopelessDialog::OnTargetRightClick)
 END_EVENT_TABLE()
@@ -1687,21 +1677,33 @@ RopelessDialog::RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi,
                                 const wxPoint& pos, const wxSize& size, long style )
             : wxDialog( parent, id, title, pos, size, style )
 {
-        pParentPi = parent_pi;
+    pParentPi = parent_pi;
 
-        this->SetSizeHints( wxDefaultSize, wxDefaultSize );
+    this->SetSizeHints( wxDefaultSize, wxDefaultSize );
 
-        wxBoxSizer* bSizer2;
-        bSizer2 = new wxBoxSizer( wxVERTICAL );
+    wxBoxSizer* bSizer2;
+    bSizer2 = new wxBoxSizer( wxVERTICAL );
 
         // The transponder list
-        long flags = wxLC_REPORT | wxLC_SINGLE_SEL | wxLC_HRULES | wxLC_VRULES |
+    long flags = wxLC_REPORT | wxLC_SINGLE_SEL | wxLC_HRULES | wxLC_VRULES |
                wxBORDER_SUNKEN;
 
-        m_pListCtrlTranponders = new OCPNListCtrl(this, ID_TRANSPONDER_LIST, wxDefaultPosition, wxDefaultSize, flags);
+    m_pListCtrlTranponders = new OCPNListCtrl(this, ID_TRANSPONDER_LIST, wxDefaultPosition, wxDefaultSize, flags);
         bSizer2->Add(m_pListCtrlTranponders, 1, wxEXPAND | wxALL, 0);
 
-         m_pListCtrlTranponders->Connect(
+#ifdef __ANDROID__
+    wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
+    int char_size = pFont->GetPointSize();
+    char font_style_sheet[200];
+    sprintf(font_style_sheet, "QHeaderView::section {  font-size:%dpt; }", char_size);
+
+    std::ostringstream ss;
+    ss << qtRLStyleSheet << font_style_sheet;
+    m_pListCtrlTranponders->GetHandle()->setStyleSheet(ss.str().c_str());
+
+#endif
+
+    m_pListCtrlTranponders->Connect(
               wxEVT_COMMAND_LIST_ITEM_RIGHT_CLICK,
               wxListEventHandler(RopelessDialog::OnTargetRightClick), NULL, this);
 
@@ -1712,29 +1714,47 @@ RopelessDialog::RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi,
 
         int dx = GetCharWidth();
 
-        int colWidth = dx * 6;
-        m_pListCtrlTranponders->InsertColumn(tlICON, _("Color"), wxLIST_FORMAT_LEFT,  colWidth);
+#if 1
+        int colWidth = dx * 9;
+        m_pListCtrlTranponders->InsertColumn(tlICON, _("Color"), wxLIST_FORMAT_CENTER,  colWidth);
 
-        colWidth = dx * 6;
-        m_pListCtrlTranponders->InsertColumn(tlIDENT, _("Ident"), wxLIST_FORMAT_LEFT,  colWidth);
+        colWidth = dx * 9;
+        m_pListCtrlTranponders->InsertColumn(tlIDENT, _("Ident"), wxLIST_FORMAT_CENTER,  colWidth);
 
-        colWidth = dx * 13;
+        colWidth = dx * 22;
         m_pListCtrlTranponders->InsertColumn(tlRELEASE_STATUS, _("Release Status"), wxLIST_FORMAT_LEFT, colWidth);
 
-        colWidth = dx * 18;
+        colWidth = dx * 29;
         m_pListCtrlTranponders->InsertColumn(tlTIMESTAMP, _("LastReportTime (UTC)"), wxLIST_FORMAT_LEFT, colWidth);
 
-        colWidth = dx * 18;
+        colWidth = dx * 20;
         m_pListCtrlTranponders->InsertColumn(tlDISTANCE, _("Distance, M"), wxLIST_FORMAT_LEFT, colWidth);
 
         colWidth = dx * 18;
         m_pListCtrlTranponders->InsertColumn(tlDEPTH, _("Depth, M"), wxLIST_FORMAT_LEFT, colWidth);
 
-        colWidth = dx * 18;
+        colWidth = dx * 10;
         m_pListCtrlTranponders->InsertColumn(tlPINGS, _("Pings"), wxLIST_FORMAT_LEFT, colWidth);
 
-        colWidth = dx * 18;
+        colWidth = dx * 20;
         m_pListCtrlTranponders->InsertColumn(tlTEMP, _("Temperature, C"), wxLIST_FORMAT_LEFT, colWidth);
+#else
+    m_pListCtrlTranponders->InsertColumn(tlICON, _("Color"), wxLIST_FORMAT_LEFT,  wxLIST_AUTOSIZE_USEHEADER);
+
+    m_pListCtrlTranponders->InsertColumn(tlIDENT, _("Ident"), wxLIST_FORMAT_LEFT,  wxLIST_AUTOSIZE_USEHEADER);
+    AdjustColumnWidth(m_pListCtrlTranponders, tlIDENT);
+
+    m_pListCtrlTranponders->InsertColumn(tlRELEASE_STATUS, _("Release Status"), wxLIST_FORMAT_LEFT, wxLIST_AUTOSIZE_USEHEADER);
+
+    m_pListCtrlTranponders->InsertColumn(tlTIMESTAMP, _("LastReportTime (UTC)"), wxLIST_FORMAT_LEFT, wxLIST_AUTOSIZE_USEHEADER);
+    AdjustColumnWidth(m_pListCtrlTranponders, tlTIMESTAMP);
+
+    m_pListCtrlTranponders->InsertColumn(tlDISTANCE, _("Distance, M"), wxLIST_FORMAT_LEFT, wxLIST_AUTOSIZE_USEHEADER);
+    m_pListCtrlTranponders->InsertColumn(tlDEPTH, _("Depth, M"), wxLIST_FORMAT_LEFT, wxLIST_AUTOSIZE_USEHEADER);
+    m_pListCtrlTranponders->InsertColumn(tlPINGS, _("Pings"), wxLIST_FORMAT_LEFT, wxLIST_AUTOSIZE_USEHEADER);
+    m_pListCtrlTranponders->InsertColumn(tlTEMP, _("Temperature, C"), wxLIST_FORMAT_LEFT, wxLIST_AUTOSIZE_USEHEADER);
+#endif
+
 
 
         // Build the color indicator bitmaps, adding to an image lst
@@ -1771,7 +1791,7 @@ RopelessDialog::RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi,
 
 
 
-
+#ifndef __ANDROID__
         wxStaticBoxSizer* sbSizerSim = new wxStaticBoxSizer( new wxStaticBox( this, wxID_ANY, _("Simulator") ), wxVERTICAL );
         bSizer2->Add( sbSizerSim, 0, wxALL|wxEXPAND, 5 );
 
@@ -1785,15 +1805,15 @@ RopelessDialog::RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi,
         sbSizerSim->Add( bsizersimButtons, 0, wxEXPAND, 5);
 
         m_ChooseFileButton = new wxButton(this, wxID_ANY, _("Choose File..."),  wxDefaultPosition, wxDefaultSize, 0);
-        bsizersimButtons->Add( m_ChooseFileButton, 0, wxALIGN_LEFT | wxALL, 5);
+        bsizersimButtons->Add( m_ChooseFileButton, 0, wxALL, 5);
         m_ChooseFileButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnChooseFileButton, this);
 
         m_StopSimButton = new wxButton(this, wxID_ANY, _("Stop Sim"),  wxDefaultPosition, wxDefaultSize, 0);
-        bsizersimButtons->Add( m_StopSimButton, 0, wxALIGN_RIGHT | wxALL, 5);
+        bsizersimButtons->Add( m_StopSimButton, 0, wxALL, 5);
         m_StopSimButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnStopSimButton, this);
 
         m_StartSimButton = new wxButton(this, wxID_ANY, _("StartSim"),  wxDefaultPosition, wxDefaultSize, 0);
-        bsizersimButtons->Add( m_StartSimButton, 0, wxALIGN_RIGHT | wxALL, 5);
+        bsizersimButtons->Add( m_StartSimButton, 0, wxALL, 5);
         m_StartSimButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnStartSimButton, this);
 
         if (pParentPi->m_simulatorTimer.IsRunning()){
@@ -1804,57 +1824,6 @@ RopelessDialog::RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi,
           m_StopSimButton->Hide();
           m_StartSimButton->Show();
         }
-
-#if 0
-        wxStaticBoxSizer* sbSizerP = new wxStaticBoxSizer( new wxStaticBox( this, wxID_ANY, _("Tender GPS Serial Port") ), wxVERTICAL );
-
-        m_comboPort = new wxComboBox(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0, NULL, 0);
-        sbSizerP->Add(m_comboPort, 0, wxEXPAND | wxTOP, 5);
-
-        bSizer2->Add( sbSizerP, 0, wxALL|wxEXPAND, 5 );
-
-        m_pSerialArray = NULL;
-        m_pSerialArray = EnumerateSerialPorts();
-
-        if (m_pSerialArray) {
-            m_comboPort->Clear();
-            for (size_t i = 0; i < m_pSerialArray->Count(); i++) {
-                m_comboPort->Append(m_pSerialArray->Item(i));
-            }
-        }
-
-        // Get the global waypoint list
-
-        wxStaticBoxSizer* sbSizerwP = new wxStaticBoxSizer( new wxStaticBox( this, wxID_ANY, _("Tracked Waypoint (by Name)") ), wxVERTICAL );
-
-        m_wpComboPort = new wxComboBox(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0, NULL, 0);
-        sbSizerwP->Add(m_wpComboPort, 0, wxEXPAND | wxTOP, 5);
-
-        bSizer2->Add( sbSizerwP, 0, wxALL|wxEXPAND, 5 );
-
-        wxArrayString guidArray = GetWaypointGUIDArray();
-
-        m_wpComboPort->Clear();
-        for(unsigned int i=0 ; i < guidArray.GetCount() ; i++){
-            wxString name = getWaypointName( guidArray[i] );
-            if(name.Length())
-                m_wpComboPort->Append(name);
-        }
-
-
-        // Icon type
-        wxStaticBoxSizer* sbSizerIcon = new wxStaticBoxSizer( new wxStaticBox( this, wxID_ANY, _("Tender Icon") ), wxVERTICAL );
-
-        m_comboIcon = new wxComboBox(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0, NULL, 0);
-        sbSizerIcon->Add(m_comboIcon, 0, wxEXPAND | wxTOP, 5);
-
-        bSizer2->Add( sbSizerIcon, 0, wxALL|wxEXPAND, 5 );
-
-
-        m_comboIcon->Clear();
-        for (size_t i = 0; i < g_iconTypeArray.Count(); i++) {
-            m_comboIcon->Append(g_iconTypeArray.Item(i));
-        }
 #endif
 
 
@@ -1862,12 +1831,9 @@ RopelessDialog::RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi,
         m_sdbSizer1 = new wxStdDialogButtonSizer();
         m_sdbSizer1OK = new wxButton( this, wxID_OK );
         m_sdbSizer1->AddButton( m_sdbSizer1OK );
-        m_sdbSizer1Cancel = new wxButton( this, wxID_CANCEL );
-        m_sdbSizer1->AddButton( m_sdbSizer1Cancel );
         m_sdbSizer1->Realize();
 
         bSizer2->Add( m_sdbSizer1, 0, wxBOTTOM|wxEXPAND|wxTOP, 5 );
-
 
         this->SetSizer( bSizer2 );
         this->Layout();
@@ -2078,22 +2044,24 @@ void RopelessDialog::OnStartSimButton(wxCommandEvent &event)
 
 void RopelessDialog::OnClose(wxCloseEvent& event)
 {
+#ifndef __ANDROID__
   wxPoint p = GetPosition();
   pParentPi->m_dialogPosX = p.x;
   pParentPi->m_dialogPosY = p.y;
   wxSize s = GetSize();
   pParentPi->m_dialogSizeWidth = s.x;
   pParentPi->m_dialogSizeHeight = s.y;
-
-	event.Skip();
+#endif
+  event.Skip();
 }
 
-void RopelessDialog::OnOkClick(wxCommandEvent& event)
+void RopelessDialog::OnOKClick(wxCommandEvent& event)
 {
+#ifndef __ANDROID__
     m_StopSimButton->Hide();
     m_StartSimButton->Show();
     g_ropelessPI->stopSim();
-
+#endif
     //EndModal( wxID_OK );
     Close();
 }

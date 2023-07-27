@@ -84,7 +84,7 @@ void LONGITUDE::Parse( double value )
    Easting = East;
    if(value < 0)
      Easting = West;
-   Longitude = abs(value);
+   Longitude = fabs(value);
 }
 
 void LONGITUDE::Set( double position, const wxString& east_or_west )

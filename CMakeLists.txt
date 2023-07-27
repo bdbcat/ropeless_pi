@@ -79,8 +79,11 @@ include(Targets)
 create_targets(${_new_manifest})
 
 if ("${BUILD_TYPE}" STREQUAL "")
+  message(STATUS "****EXIT 1")
   return ()
 endif ()
+
+message(STATUS "****PASS 2")
 
 if (NOT ${BUILD_TYPE} STREQUAL "flatpak")
   # Build package as required (flatpak already dealt with).
@@ -88,7 +91,8 @@ if (NOT ${BUILD_TYPE} STREQUAL "flatpak")
   include(PluginInstall)
   if (QT_ANDROID)
     include(AndroidLibs)
-    include_directories(${CMAKE_SOURCE_DIR}/src)
+    #include_directories(${CMAKE_ANDROID_NDK}/sysroot/usr/include)
+    #target_include_directories(${PACKAGE_NAME} PUBLIC "s/home/dsr/Android/Sdk/ndk-bundle/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include")
   else ()
     include(PluginLibs)
   endif ()

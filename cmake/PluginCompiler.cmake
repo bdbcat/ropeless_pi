@@ -28,6 +28,7 @@ elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang")           # Apple is AppleClang
   string(APPEND CMAKE_C_FLAGS " ${_ocpn_cflags}")
   string(APPEND CMAKE_CXX_FLAGS " ${_ocpn_cflags}")
   string(APPEND CMAKE_CXX_FLAGS " -Wno-inconsistent-missing-override")
+  string(APPEND CMAKE_CXX_FLAGS " -Wno-overloaded-virtual")
   string(APPEND CMAKE_CXX_FLAGS " -Wno-potentially-evaluated-expression")
   string(APPEND CMAKE_SHARED_LINKER_FLAGS " -Wl -undefined dynamic_lookup")
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
