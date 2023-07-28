@@ -29,7 +29,6 @@
 #endif //precompiled headers
 #include <typeinfo>
 #include <wx/graphics.h>
-#include <wx/numdlg.h>
 
 #include "config.h"
 #include "ropeless_pi.h"
@@ -42,6 +41,7 @@
 #include "georef.h"
 #include "OCPNListCtrl.h"
 #include "pugixml.hpp"
+#include "mynumdlg.h"
 
 #include <arpa/inet.h>
 #include <netinet/tcp.h>
@@ -632,17 +632,22 @@ void ropeless_pi::PopupMenuHandler( wxCommandEvent& event )
           msg1.Printf("%d\n", g_ropelessPI->m_foundState->ident);
           msg += msg1;
 
-          //int ret = OCPNMessageBox_PlugIn(NULL, msg, _("ropeless_pi Message"), wxYES_NO);
-          //if(ret == wxID_YES)
-          //  SendReleaseMessage(m_foundState);
+          long result = -1;
+          myNumberEntryDialog dialog;
+#ifdef __ANDROID__
+          wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
+          dialog.SetFont(*pFont);
+#endif
+          dialog.Create(GetOCPNCanvasWindow(),
+                                     msg,
+                                     "Enter Release Code",
+                                     "Ropeless Plugin Message",
+                                     0, 0, 100000,
+                                     wxDefaultPosition);
+         if (dialog.ShowModal() == wxID_OK)
+            result =dialog.GetValue();
 
-          long result = 1;
-          //long result = wxGetNumberFromUser( msg,
-          //                  "Enter Release Code",
-          //                  "Ropeless Plugin Message",
-          //                  0, 0, 100000);
-
-          if (result >= 0)
+         if (result >= 0)
             SendReleaseMessage(g_ropelessPI->m_foundState, result);
 
           handled = true;
@@ -1422,7 +1427,7 @@ bool ropeless_pi::MouseEventHook( wxMouseEvent &event )
 
     if( event.RightDown() ) {
 
-        if( 1/*m_sel_brg || m_bshow_fix_hat*/){
+        if( 1){
 
 
             if(m_foundState){
@@ -1430,6 +1435,11 @@ bool ropeless_pi::MouseEventHook( wxMouseEvent &event )
 
                 wxMenuItem *release_item = 0;
                 release_item = new wxMenuItem(contextMenu, ID_TPR_RELEASE, _("Release Transponder") );
+#ifdef __ANDROID__
+                wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
+                release_item->SetFont(*pFont);
+#endif
+
                 contextMenu->Append(release_item);
                 GetOCPNCanvasWindow()->Connect( ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
                                                 wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, this );
