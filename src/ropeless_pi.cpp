@@ -1704,11 +1704,15 @@ RopelessDialog::RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi,
 #ifdef __ANDROID__
     wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
     int char_size = pFont->GetPointSize();
+
     char font_style_sheet[200];
     sprintf(font_style_sheet, "QHeaderView::section {  font-size:%dpt; }", char_size);
 
+    char item_font_style_sheet[200];
+    sprintf(item_font_style_sheet, "QTreeWidget {  font-size:%dpt; }", char_size);
+
     std::ostringstream ss;
-    ss << qtRLStyleSheet << font_style_sheet;
+    ss << qtRLStyleSheet << font_style_sheet << item_font_style_sheet;
     m_pListCtrlTranponders->GetHandle()->setStyleSheet(ss.str().c_str());
 
 #endif
