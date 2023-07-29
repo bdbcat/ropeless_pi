@@ -64,11 +64,11 @@ static const long long lNaN = 0xfff8000000000000;
 #ifdef __ANDROID__
 
 char qtRLStyleSheet[] =
-"QScrollBar:horizontal {border: 0px solid grey; background-color: rgb(240, 240, 240); height: 20px; margin: 0px 1px 0 1px;}\
+"QScrollBar:horizontal {border: 0px solid grey; background-color: rgb(240, 240, 240); height: 30px; margin: 0px 1px 0 1px;}\
 QScrollBar::handle:horizontal {background-color: rgb(200, 200, 200); min-width: 20px; border-radius: 10px; }\
 QScrollBar::add-line:horizontal {border: 0px solid grey; background: #32CC99; width: 0px; subcontrol-position: right; subcontrol-origin: margin; }\
 QScrollBar::sub-line:horizontal {border: 0px solid grey; background: #32CC99; width: 0px; subcontrol-position: left; subcontrol-origin: margin; }\
-QScrollBar:vertical {border: 0px solid grey; background-color: rgb(240, 240, 240); width: 20px; margin: 1px 0px 1px 0px; }\
+QScrollBar:vertical {border: 0px solid grey; background-color: rgb(240, 240, 240); width: 30px; margin: 1px 0px 1px 0px; }\
 QScrollBar::handle:vertical {background-color: rgb(200, 200, 200); min-height: 50px; border-radius: 10px; }\
 QScrollBar::add-line:vertical {border: 0px solid grey; background: #32CC99; height: 0px; subcontrol-position: top; subcontrol-origin: margin; }\
 QScrollBar::sub-line:vertical {border: 0px solid grey; background: #32CC99; height: 0px; subcontrol-position: bottom; subcontrol-origin: margin; }\
@@ -1665,16 +1665,6 @@ void PI_EventHandler::OnEvtOCPN_NMEA( PI_OCPN_DataStreamEvent& event )
 #endif
 }
 
-void AdjustColumnWidth(OCPNListCtrl *list, int col){
-    int wh = list->GetColumnWidth(col);
-    //list->SetColumnWidth(col, wxLIST_AUTOSIZE );
-    list->SetColumnWidth(col, wh );
-//    int wc = list->GetColumnWidth(col);
-//    if (wh > wc)
-//        list->SetColumnWidth(col, wxLIST_AUTOSIZE_USEHEADER );
-}
-
-
 
 BEGIN_EVENT_TABLE( RopelessDialog, wxDialog )
 EVT_BUTTON( wxID_OK, RopelessDialog::OnOKClick )
@@ -1688,6 +1678,8 @@ RopelessDialog::RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi,
             : wxDialog( parent, id, title, pos, size, style )
 {
     pParentPi = parent_pi;
+    wxFont *dFont = OCPNGetFont(_T("Dialog"), 0);
+    SetFont(*dFont);
 
     this->SetSizeHints( wxDefaultSize, wxDefaultSize );
 
@@ -1728,47 +1720,29 @@ RopelessDialog::RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi,
 
         int dx = GetCharWidth();
 
-#if 1
-        int colWidth = dx * 9;
-        m_pListCtrlTranponders->InsertColumn(tlICON, _("Color"), wxLIST_FORMAT_CENTER,  colWidth);
+        wxSize txs = GetTextExtent("Color");
+        m_pListCtrlTranponders->InsertColumn(tlICON, _("Color"), wxLIST_FORMAT_CENTER,  txs.x + dx*2);
 
-        colWidth = dx * 9;
-        m_pListCtrlTranponders->InsertColumn(tlIDENT, _("Ident"), wxLIST_FORMAT_CENTER,  colWidth);
+        txs = GetTextExtent("Ident");
+        m_pListCtrlTranponders->InsertColumn(tlIDENT, _("Ident"), wxLIST_FORMAT_CENTER,  txs.x + dx*2);
 
-        colWidth = dx * 22;
-        m_pListCtrlTranponders->InsertColumn(tlRELEASE_STATUS, _("Release Status"), wxLIST_FORMAT_LEFT, colWidth);
+        txs = GetTextExtent("Release Status");
+        m_pListCtrlTranponders->InsertColumn(tlRELEASE_STATUS, _("Release Status"), wxLIST_FORMAT_CENTER, txs.x + dx*2);
 
-        colWidth = dx * 29;
-        m_pListCtrlTranponders->InsertColumn(tlTIMESTAMP, _("LastReportTime (UTC)"), wxLIST_FORMAT_LEFT, colWidth);
+        txs = GetTextExtent("LastReportTime (UTC)");
+        m_pListCtrlTranponders->InsertColumn(tlTIMESTAMP, _("LastReportTime (UTC)"), wxLIST_FORMAT_CENTER, txs.x + dx*2);
 
-        colWidth = dx * 20;
-        m_pListCtrlTranponders->InsertColumn(tlDISTANCE, _("Distance, M"), wxLIST_FORMAT_LEFT, colWidth);
+        txs = GetTextExtent("Color");
+        m_pListCtrlTranponders->InsertColumn(tlDISTANCE, _("Distance, M"), wxLIST_FORMAT_CENTER, txs.x + dx*2);
 
-        colWidth = dx * 18;
-        m_pListCtrlTranponders->InsertColumn(tlDEPTH, _("Depth, M"), wxLIST_FORMAT_LEFT, colWidth);
+        txs = GetTextExtent("Distance, M");
+        m_pListCtrlTranponders->InsertColumn(tlDEPTH, _("Depth, M"), wxLIST_FORMAT_CENTER, txs.x + dx*2);
 
-        colWidth = dx * 10;
-        m_pListCtrlTranponders->InsertColumn(tlPINGS, _("Pings"), wxLIST_FORMAT_LEFT, colWidth);
+        txs = GetTextExtent("Pings");
+        m_pListCtrlTranponders->InsertColumn(tlPINGS, _("Pings"), wxLIST_FORMAT_CENTER, txs.x + dx*2);
 
-        colWidth = dx * 20;
-        m_pListCtrlTranponders->InsertColumn(tlTEMP, _("Temperature, C"), wxLIST_FORMAT_LEFT, colWidth);
-#else
-    m_pListCtrlTranponders->InsertColumn(tlICON, _("Color"), wxLIST_FORMAT_LEFT,  wxLIST_AUTOSIZE_USEHEADER);
-
-    m_pListCtrlTranponders->InsertColumn(tlIDENT, _("Ident"), wxLIST_FORMAT_LEFT,  wxLIST_AUTOSIZE_USEHEADER);
-    AdjustColumnWidth(m_pListCtrlTranponders, tlIDENT);
-
-    m_pListCtrlTranponders->InsertColumn(tlRELEASE_STATUS, _("Release Status"), wxLIST_FORMAT_LEFT, wxLIST_AUTOSIZE_USEHEADER);
-
-    m_pListCtrlTranponders->InsertColumn(tlTIMESTAMP, _("LastReportTime (UTC)"), wxLIST_FORMAT_LEFT, wxLIST_AUTOSIZE_USEHEADER);
-    AdjustColumnWidth(m_pListCtrlTranponders, tlTIMESTAMP);
-
-    m_pListCtrlTranponders->InsertColumn(tlDISTANCE, _("Distance, M"), wxLIST_FORMAT_LEFT, wxLIST_AUTOSIZE_USEHEADER);
-    m_pListCtrlTranponders->InsertColumn(tlDEPTH, _("Depth, M"), wxLIST_FORMAT_LEFT, wxLIST_AUTOSIZE_USEHEADER);
-    m_pListCtrlTranponders->InsertColumn(tlPINGS, _("Pings"), wxLIST_FORMAT_LEFT, wxLIST_AUTOSIZE_USEHEADER);
-    m_pListCtrlTranponders->InsertColumn(tlTEMP, _("Temperature, C"), wxLIST_FORMAT_LEFT, wxLIST_AUTOSIZE_USEHEADER);
-#endif
-
+        txs = GetTextExtent("Temperature, C");
+        m_pListCtrlTranponders->InsertColumn(tlTEMP, _("Temperature, C"), wxLIST_FORMAT_CENTER, txs.x + dx*2);
 
 
         // Build the color indicator bitmaps, adding to an image lst
@@ -1851,7 +1825,7 @@ RopelessDialog::RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi,
 
         this->SetSizer( bSizer2 );
         this->Layout();
-        bSizer2->Fit( this );
+        //bSizer2->Fit( this );
 
         this->Centre( wxBOTH );
 }
@@ -1875,30 +1849,34 @@ void RopelessDialog::OnTargetRightClick(wxListEvent &event) {
     const wxPoint pt = wxGetMousePosition();
     mouseX = pt.x - m_pListCtrlTranponders->GetScreenPosition().x;
     mouseY = pt.y - m_pListCtrlTranponders->GetScreenPosition().y;
-    mouseY -= rect.y;
+    mouseY -= rect.height;
 
     int flags;
     index = m_pListCtrlTranponders->HitTest(wxPoint(mouseX, mouseY),
               flags);
 
-      if( index >= 0 ) {
+    if( index >= 0 ) {
 
-        g_ropelessPI->m_foundState = transponderStatus[index];
+      g_ropelessPI->m_foundState = transponderStatus[index];
 
-        wxMenu* contextMenu = new wxMenu;
-        wxMenuItem *release_item = 0;
+      wxMenu* contextMenu = new wxMenu;
+      wxMenuItem *release_item = 0;
 
-        release_item = new wxMenuItem(contextMenu, ID_TPR_RELEASE, _("Release Transponder") );
-        contextMenu->Append(release_item);
-        GetOCPNCanvasWindow()->Connect( ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
-                                                wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, pParentPi );
+      release_item = new wxMenuItem(contextMenu, ID_TPR_RELEASE, _("Release Transponder") );
+#ifdef __ANDROID__
+      wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
+      release_item->SetFont(*pFont);
+#endif
+      contextMenu->Append(release_item);
+      GetOCPNCanvasWindow()->Connect( ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
+               wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, pParentPi );
 
-        //   Invoke the drop-down menu
-        GetOCPNCanvasWindow()->PopupMenu( contextMenu, wxGetMousePosition().x, wxGetMousePosition().y );
+      //   Invoke the drop-down menu
+      GetOCPNCanvasWindow()->PopupMenu( contextMenu, wxGetMousePosition().x, wxGetMousePosition().y );
 
-        if(release_item)
-          GetOCPNCanvasWindow()->Disconnect( ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
-                                         wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, pParentPi );
+      if(release_item)
+        GetOCPNCanvasWindow()->Disconnect( ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
+           wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, pParentPi );
     }
   }
 }
@@ -1951,6 +1929,7 @@ void RopelessDialog::RefreshTransponderList()
     //item.SetText(sid);
     //m_pListCtrlTranponders->SetItem(item);
     m_pListCtrlTranponders->SetItem(result, tlIDENT, sid);
+    m_pListCtrlTranponders->SetColumnWidth(tlIDENT, wxLIST_AUTOSIZE_USEHEADER );
 
     //item.SetColumn(tlRELEASE_STATUS);
     wxString srs;
@@ -1961,6 +1940,7 @@ void RopelessDialog::RefreshTransponderList()
     //item.SetText(sid);
     //m_pListCtrlTranponders->SetItem(item);
     m_pListCtrlTranponders->SetItem(result, tlRELEASE_STATUS, sid);
+    m_pListCtrlTranponders->SetColumnWidth(tlRELEASE_STATUS, wxLIST_AUTOSIZE_USEHEADER );
 
     //item.SetColumn(tlTIMESTAMP);
     wxString sts;
@@ -1968,10 +1948,8 @@ void RopelessDialog::RefreshTransponderList()
     wxDateTime ts((time_t)(state->timeStamp));
     ts.MakeUTC();
     sts = ts.FormatISOCombined(' ');
-    //sts.Printf("%g", state->timeStamp);
-    //item.SetText(sts);
-    //m_pListCtrlTranponders->SetItem(item);
     m_pListCtrlTranponders->SetItem(result, tlTIMESTAMP, sts);
+    m_pListCtrlTranponders->SetColumnWidth(tlTIMESTAMP, wxLIST_AUTOSIZE_USEHEADER );
 
     //item.SetColumn(tlDEPTH);
     wxString sdp;
@@ -1979,6 +1957,7 @@ void RopelessDialog::RefreshTransponderList()
     //item.SetText(sdp);
     //m_pListCtrlTranponders->SetItem(item);
     m_pListCtrlTranponders->SetItem(result, tlDEPTH, sdp);
+    m_pListCtrlTranponders->SetColumnWidth(tlDEPTH, wxLIST_AUTOSIZE_USEHEADER );
 
     //item.SetColumn(tlTEMP);
     wxString stemp;
@@ -1986,6 +1965,7 @@ void RopelessDialog::RefreshTransponderList()
     //item.SetText(stemp);
     //m_pListCtrlTranponders->SetItem(item);
     m_pListCtrlTranponders->SetItem(result, tlTEMP, stemp);
+    m_pListCtrlTranponders->SetColumnWidth(tlTEMP, wxLIST_AUTOSIZE_USEHEADER );
 
     //item.SetColumn(tlPINGS);
     wxString sping;
@@ -1993,6 +1973,7 @@ void RopelessDialog::RefreshTransponderList()
     //item.SetText(sping);
     //m_pListCtrlTranponders->SetItem(item);
     m_pListCtrlTranponders->SetItem(result, tlPINGS, sping);
+    m_pListCtrlTranponders->SetColumnWidth(tlPINGS, wxLIST_AUTOSIZE_USEHEADER );
 
     //item.SetColumn(tlDISTANCE);
     wxString sdist;
@@ -2000,6 +1981,7 @@ void RopelessDialog::RefreshTransponderList()
     //item.SetText(sdist);
     //m_pListCtrlTranponders->SetItem(item);
     m_pListCtrlTranponders->SetItem(result, tlDISTANCE, sdist);
+    m_pListCtrlTranponders->SetColumnWidth(tlDISTANCE, wxLIST_AUTOSIZE_USEHEADER );
 
   }
 
