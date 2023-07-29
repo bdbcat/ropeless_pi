@@ -16,6 +16,8 @@ ____________________
 4.  Get the plugin source tree and require submodules from github
     $ git clone https://github.com/bdbcat/ropeless_pi.git
     $ cd ropeless_pi
+    $ git checkout -b master
+    $ git pull origin master
     $ git submodule update --init opencpn-libs
 
 5.  Get the dependencies and system libraries/tool required to build the plugin
@@ -40,7 +42,7 @@ The build product resulting from a successful build process is a tarball file wh
 The tarball build product is located in the "build" directory, and named something like:
 "ropeless-0.4.0.0+2307281851.ab85b9b_ubuntu-wx32-22.04-x86_64.tar.gz"
 
-Import the tarbal into OpenCPN
+Import the tarball into OpenCPN
 __________________________________
 1.  Settings->Plugins->Import Plugin.
 
