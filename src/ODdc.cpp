@@ -36,13 +36,18 @@
 #include <windows.h>
 #endif
 
-#ifdef USE_ANDROID_GLES2
-#include "ODShaders.h"
-#include <gl2.h>
-#include "linmath.h"
-#endif
-
 #ifdef ocpnUSE_GL
+    #ifdef USE_ANDROID_GLES2
+        #include "ODShaders.h"
+        #include "linmath.h"
+        #include <GLES/gl.h>
+        #include <GLES2/gl2ext.h>
+        #include <GLES2/gl2.h>
+        #include "qdebug.h"
+    #else
+        #include <GL/gl.h>
+    #endif
+
 #include <wx/glcanvas.h>
 #endif
 
@@ -57,7 +62,7 @@
 //#include "wx28compat.h"
 //#include "cutil.h"
 
-#include <GL/glu.h>
+#include "GL/glu.h"
 
 #define __CALL_CONVENTION
 
@@ -216,11 +221,11 @@ void ODDC::SetGLAttrs( bool highQuality )
     //      Enable anti-aliased polys, at best quality
     if( highQuality ) {
         glEnable( GL_LINE_SMOOTH );
-        glEnable( GL_POLYGON_SMOOTH );
+        //glEnable( GL_POLYGON_SMOOTH );
         glEnable( GL_BLEND );
     } else {
         glDisable(GL_LINE_SMOOTH);
-        glDisable( GL_POLYGON_SMOOTH );
+        //glDisable( GL_POLYGON_SMOOTH );
         glDisable( GL_BLEND );
     }
 
@@ -616,10 +621,10 @@ void ODDC::DrawLine( wxCoord x1, wxCoord y1, wxCoord x2, wxCoord y2, bool b_hiqu
         }
         else {
 
-            checkGlError("Before glUseProgram", "ODDC", __LINE__);
+            ////checkGlError("Before glUseProgram", "ODDC", __LINE__);
             GLint program = pi_colorv_tri_shader_program;
             glUseProgram(program);
-            checkGlError("After glUseProgram", "ODDC", __LINE__);
+            //checkGlError("After glUseProgram", "ODDC", __LINE__);
 
             float fBuf[4];
             GLint pos = glGetAttribLocation(program, "aPos");
@@ -748,7 +753,7 @@ void ODDC::DrawLine( wxCoord x1, wxCoord y1, wxCoord x2, wxCoord y2, bool b_hiqu
             }
         }
 #endif
-        glDisable( GL_LINE_STIPPLE );
+        //glDisable( GL_LINE_STIPPLE );
 
         if( b_hiqual ) {
             glDisable( GL_LINE_SMOOTH );
@@ -882,7 +887,7 @@ void ODDC::DrawLines( int n, wxPoint points[], wxCoord xoffset, wxCoord yoffset,
 #endif
         bool b_draw_thick = false;
 
-        glDisable( GL_LINE_STIPPLE );
+        //glDisable( GL_LINE_STIPPLE );
         SetGLStipple();
 
         //      Enable anti-aliased lines, at best quality
@@ -916,8 +921,8 @@ void ODDC::DrawLines( int n, wxPoint points[], wxCoord xoffset, wxCoord yoffset,
         } else {
             if( b_hiqual ) {
                 glEnable( GL_LINE_SMOOTH );
-                glDisable( GL_LINE_STIPPLE );
-                glDisable( GL_POLYGON_SMOOTH );
+                //glDisable( GL_LINE_STIPPLE );
+                //glDisable( GL_POLYGON_SMOOTH );
                 glDisable( GL_BLEND );
             }
         }
@@ -959,8 +964,8 @@ void ODDC::DrawLines( int n, wxPoint points[], wxCoord xoffset, wxCoord yoffset,
 
 #endif
         if( b_hiqual ) {
-            glDisable( GL_LINE_STIPPLE );
-            glDisable( GL_POLYGON_SMOOTH );
+            //glDisable( GL_LINE_STIPPLE );
+            //glDisable( GL_POLYGON_SMOOTH );
             glDisable( GL_BLEND );
         }
 
@@ -1107,10 +1112,10 @@ void ODDC::DrawSector( wxCoord xc, wxCoord yc, wxCoord x1, wxCoord y1, wxCoord x
             wxGC->FillPath(gpath);
         }
 #else
-        wxPoint *points;
-        int numpoints = ArcSectorPoints( *&points, xc, yc, x1, y1, x2, y2, x3, y3, x4, y4, true);
-        DrawPolygon(numpoints, points);
-        delete [] points;
+//        wxPoint *points;
+//        int numpoints = ArcSectorPoints( *&points, xc, yc, x1, y1, x2, y2, x3, y3, x4, y4, true);
+//        DrawPolygon(numpoints, points);
+//        delete [] points;
 #endif
     }
 #ifdef ocpnUSE_GL
@@ -1322,9 +1327,9 @@ void ODDC::drawrrhelperGLES2( wxCoord x0, wxCoord y0, wxCoord r, int quadrant, i
         drawrrhelperGLES2( x2, y2, r, 3, steps );
 
         GLint program = pi_colorv_tri_shader_program;
-        checkGlError("Before glUseProgram", "ODDC", __LINE__);
+        //checkGlError("Before glUseProgram", "ODDC", __LINE__);
         glUseProgram( program );
-        checkGlError("After glUseProgram", "ODDC", __LINE__);
+        //checkGlError("After glUseProgram", "ODDC", __LINE__);
 
         // Get pointers to the attributes in the program.
         GLint mPosAttrib = glGetAttribLocation( program, "aPos" );
@@ -1399,6 +1404,7 @@ void ODDC::drawrrhelperGLES2( wxCoord x0, wxCoord y0, wxCoord r, int quadrant, i
 
 void ODDC::DrawCircle( wxCoord x, wxCoord y, wxCoord radius )
 {
+#if 1
 #ifdef USE_ANDROID_GLES2
 
     //      Enable anti-aliased lines, at best quality
@@ -1411,9 +1417,9 @@ void ODDC::DrawCircle( wxCoord x, wxCoord y, wxCoord radius )
     coords[6] = x + radius;  coords[7] = y - radius;
 
     GLint program = pi_circle_filled_shader_program;
-    checkGlError("Before glUseProgram", "ODDC", __LINE__);
+    //checkGlError("Before glUseProgram", "ODDC", __LINE__);
     glUseProgram( program );
-    checkGlError("After glUseProgram", "ODDC", __LINE__);
+    //checkGlError("After glUseProgram", "ODDC", __LINE__);
 
     // Get pointers to the attributes in the program.
     GLint mPosAttrib = glGetAttribLocation( program, "aPos" );
@@ -1433,7 +1439,7 @@ void ODDC::DrawCircle( wxCoord x, wxCoord y, wxCoord radius )
     GLint centerloc = glGetUniformLocation(program, "circle_center");
     float ctrv[2];
     ctrv[0] = x;
-    ctrv[1] = GetCanvasByIndex(0)->GetSize().y - y;
+    ctrv[1] = m_vpSize.y - y;
     glUniform2fv(centerloc, 1, ctrv);
 
     //  Circle color
@@ -1469,6 +1475,7 @@ void ODDC::DrawCircle( wxCoord x, wxCoord y, wxCoord radius )
 
 #else
     DrawEllipse( x - radius, y - radius, 2 * radius, 2 * radius );
+#endif
 #endif
 }
 
@@ -1676,14 +1683,14 @@ void ODDC::DrawPolygon( int n, wxPoint points[], wxCoord xoffset, wxCoord yoffse
             }
 
             GLint program = pi_texture_2D_shader_program;
-            checkGlError("Before glUseProgram", "ODDC", __LINE__);
+            //checkGlError("Before glUseProgram", "ODDC", __LINE__);
             glUseProgram( program );
-            checkGlError("Afore glUseProgram", "ODDC", __LINE__);
-            checkGlError("glUseProgram", "ODDC", __LINE__);
+            //checkGlError("Afore glUseProgram", "ODDC", __LINE__);
+            //checkGlError("glUseProgram", "ODDC", __LINE__);
 
             // Get pointers to the attributes in the program.
             GLint mPosAttrib = glGetAttribLocation( program, "aPos" );
-            checkGlError("aPos", "ODDC", __LINE__);
+            //checkGlError("aPos", "ODDC", __LINE__);
 
             // Disable VBO's (vertex buffer objects) for attributes.
             glBindBuffer( GL_ARRAY_BUFFER, 0 );
@@ -1700,7 +1707,7 @@ void ODDC::DrawPolygon( int n, wxPoint points[], wxCoord xoffset, wxCoord yoffse
             bcolorv[3] = m_pen.GetColour().Alpha() / float(256);
 
             GLint bcolloc = glGetUniformLocation(program, "uColour");
-            checkGlError("uColour", "ODDC", __LINE__);
+            //checkGlError("uColour", "ODDC", __LINE__);
             glUniform4fv(bcolloc, 1, bcolorv);
             if(bcolloc == -1)
                 wxLogMessage(_("ODDC::DrawPolygon: bcolloc -1"));
@@ -1815,7 +1822,7 @@ void ODDC::DrawPolygon( int n, wxPoint points[], wxCoord xoffset, wxCoord yoffse
 
             // Get pointers to the attributes in the program.
             GLint mPosAttrib = glGetAttribLocation( program, "aPos" );
-            checkGlError("mPosAttrib", "ODDC", __LINE__);
+            //checkGlError("mPosAttrib", "ODDC", __LINE__);
 
             // Disable VBO's (vertex buffer objects) for attributes.
             glBindBuffer( GL_ARRAY_BUFFER, 0 );
@@ -1832,7 +1839,7 @@ void ODDC::DrawPolygon( int n, wxPoint points[], wxCoord xoffset, wxCoord yoffse
             bcolorv[3] = m_pen.GetColour().Alpha() / float(256);
 
             GLint bcolloc = glGetUniformLocation(program, "uColour");
-            checkGlError("uColour", "ODDC", __LINE__);
+            //checkGlError("uColour", "ODDC", __LINE__);
             glUniform4fv(bcolloc, 1, bcolorv);
 
             // Rotate
@@ -1845,7 +1852,7 @@ void ODDC::DrawPolygon( int n, wxPoint points[], wxCoord xoffset, wxCoord yoffse
             Q[3][1] = yoffset;
 
             GLint matloc = glGetUniformLocation(program, "TransformMatrix");
-            checkGlError("TransformMatrix", "ODDC", __LINE__);
+            //checkGlError("TransformMatrix", "ODDC", __LINE__);
             glUniformMatrix4fv( matloc, 1, GL_FALSE, (const GLfloat*)Q);
 
             // Perform the actual drawing.
@@ -1967,40 +1974,40 @@ void ODDC::DrawPolygonPattern( int n, wxPoint points[], int textureID, wxSize te
             }
 
             //GLint program = pi_color_tri_shader_program;
-            checkGlError("Before glUseProgram", "ODDC", __LINE__);
+            //checkGlError("Before glUseProgram", "ODDC", __LINE__);
             GLint program = pi_texture_2D_shader_program;
             //GLint program = pi_colorv_tri_shader_program;
             glUseProgram( program );
-            checkGlError("glUseProgram", "ODDC", __LINE__);
+            //checkGlError("glUseProgram", "ODDC", __LINE__);
 
             // Get pointers to the attributes in the program.
             // Position of vertex(s)
             GLint mPosAttrib = glGetAttribLocation( program, "aPos" );
-            checkGlError("mPosAttrib", "ODDC", __LINE__);
+            //checkGlError("mPosAttrib", "ODDC", __LINE__);
             // Texture coordinates
             GLint mUvAttrib  = glGetAttribLocation( program, "aUV" );
-            checkGlError("mUvAttrib", "ODDC", __LINE__);
+            //checkGlError("mUvAttrib", "ODDC", __LINE__);
 
             // Rotate
             GLint uRotateMatrix  = glGetUniformLocation( program, "MVMatrix" );
-            checkGlError("MVMatrix", "ODDC", __LINE__);
+            //checkGlError("MVMatrix", "ODDC", __LINE__);
 
             //Transform
             GLint uTranslateMatrix  = glGetUniformLocation( program, "TransformMatrix" );
-            checkGlError("TransformMatrix", "ODDC", __LINE__);
+            //checkGlError("TransformMatrix", "ODDC", __LINE__);
 
             // Set up the texture sampler to texture unit 0
             GLint texUni = glGetUniformLocation( program, "uTexture" );
-            checkGlError("texUni", "ODDC", __LINE__);
+            //checkGlError("texUni", "ODDC", __LINE__);
 
             // Disable VBO's (vertex buffer objects) for attributes.
             glBindBuffer( GL_ARRAY_BUFFER, 0 );
             glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
 
             glEnableVertexAttribArray( mPosAttrib );
-            checkGlError("glEnableVertexAttribArray:mPosAttrib", "ODDC", __LINE__);
+            //checkGlError("glEnableVertexAttribArray:mPosAttrib", "ODDC", __LINE__);
             glVertexAttribPointer( mPosAttrib, 2, GL_FLOAT, GL_FALSE, 2*sizeof(GLfloat), workBuf );
-            checkGlError("glVertexAttribPointer:mPosAttrib", "ODDC", __LINE__);
+            //checkGlError("glVertexAttribPointer:mPosAttrib", "ODDC", __LINE__);
 
             //  Pattern color
             float bcolorv[4];
@@ -2010,9 +2017,9 @@ void ODDC::DrawPolygonPattern( int n, wxPoint points[], int textureID, wxSize te
             bcolorv[3] = m_brush.GetColour().Alpha() / float(256);
 
             GLint bcolloc = glGetUniformLocation(program, "uColour");
-            checkGlError("bcolloc", "ODDC", __LINE__);
+            //checkGlError("bcolloc", "ODDC", __LINE__);
             glUniform4fv(bcolloc, 1, bcolorv);
-            checkGlError("glUniform4fv(bcolloc", "ODDC", __LINE__);
+            //checkGlError("glUniform4fv(bcolloc", "ODDC", __LINE__);
 
             // Only a triangle can be convex all the time
             if(n == 3){
@@ -2022,14 +2029,14 @@ void ODDC::DrawPolygonPattern( int n, wxPoint points[], int textureID, wxSize te
                     GLfloat((workBuf[4] - g_min_x)/g_iTextureWidth/2), GLfloat((workBuf[5] - g_min_y)/g_iTextureHeight/2)
                 };
                 glEnableVertexAttribArray( mUvAttrib );
-                checkGlError("glEnableVertexAttribArray( mUvAttrib )", "ODDC", __LINE__);
+                //checkGlError("glEnableVertexAttribArray( mUvAttrib )", "ODDC", __LINE__);
                 glVertexAttribPointer( mUvAttrib, 2, GL_FLOAT, GL_FALSE, 2*sizeof(GLfloat), UVCoords );
-                checkGlError("glVertexAttribPointer", "ODDC", __LINE__);
+                //checkGlError("glVertexAttribPointer", "ODDC", __LINE__);
                 glDrawArrays(GL_TRIANGLES, 0, 3);
-                checkGlError("glDrawArrays(GL_TRIANGLES)", "ODDC", __LINE__);
+                //checkGlError("glDrawArrays(GL_TRIANGLES)", "ODDC", __LINE__);
             }
             glUseProgram( 0 );
-            checkGlError("glUseProgram(0)", "ODDC", __LINE__);
+            //checkGlError("glUseProgram(0)", "ODDC", __LINE__);
 
         }
 #else           // USE_ANDROID_GLES2
@@ -2204,7 +2211,7 @@ void odc_endCallbackD_GLSL(void *data)
 
     GLint program = pDC->s_odc_activeProgram;
     glUseProgram(program);
-    checkGlError("glUseProgram", "ODDC", __LINE__);
+    //checkGlError("glUseProgram", "ODDC", __LINE__);
 
     // Disable VBO's (vertex buffer objects) for attributes.
     glBindBuffer( GL_ARRAY_BUFFER, 0 );
@@ -2212,7 +2219,7 @@ void odc_endCallbackD_GLSL(void *data)
 
     float *bufPt = &(pDC->s_odc_tess_work_buf[pDC->s_odc_tess_vertex_idx_this]);
     GLint pos = glGetAttribLocation(program, "aPos");
-    checkGlError("aPos", "ODDC", __LINE__);
+    //checkGlError("aPos", "ODDC", __LINE__);
     glVertexAttribPointer(pos, 2, GL_FLOAT, GL_FALSE, 2*sizeof(float), bufPt);
     glEnableVertexAttribArray(pos);
 
@@ -2220,10 +2227,10 @@ void odc_endCallbackD_GLSL(void *data)
 //    glUniformMatrix4fv( matloc, 1, GL_FALSE, (const GLfloat*)s_tessVP.vp_transform);
 
     GLint mUvAttrib  = glGetAttribLocation( program, "aUV" );
-    checkGlError("mUvAttrib", "ODDC", __LINE__);
+    //checkGlError("mUvAttrib", "ODDC", __LINE__);
     float *bufTex = &(pDC->s_odc_tess_tex_buf[pDC->s_odc_tess_vertex_idx_this]);
     glVertexAttribPointer( mUvAttrib, 2, GL_FLOAT, GL_FALSE, 2*sizeof(GLfloat), bufTex );
-    checkGlError("glVertexAttribPointer( mUvAttrib)", "ODDC", __LINE__);
+    //checkGlError("glVertexAttribPointer( mUvAttrib)", "ODDC", __LINE__);
 /*
     float colorv[4];
     wxColour c = pDC->GetBrush().GetColour();
@@ -2378,7 +2385,7 @@ void ODDC::DrawPolygonTessellated( int n, wxPoint points[], wxCoord xoffset, wxC
 }
 
 #ifdef ocpnUSE_GL
-#ifndef ANDROID
+#ifndef USE_ANDROID_GLES2
 
 void __CALL_CONVENTION ODDCPatterncombineCallback(GLdouble coords[3], GLdouble *vertex_data[4], GLfloat weight[4], GLdouble **dataOut)
 {
@@ -2480,37 +2487,37 @@ void ODDC::DrawPolygonTessellatedPattern( int n, wxPoint points[], int textureID
         GLint program = pi_texture_2D_shader_program;
         s_odc_activeProgram = program;
         glUseProgram( program );
-        checkGlError("glUseProgram", "ODDC", __LINE__);
+        //checkGlError("glUseProgram", "ODDC", __LINE__);
 
         // Disable VBO's (vertex buffer objects) for attributes.
         glBindBuffer( GL_ARRAY_BUFFER, 0 );
-        checkGlError("glBindBuffer", "ODDC", __LINE__);
+        //checkGlError("glBindBuffer", "ODDC", __LINE__);
         glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
-        checkGlError("glBindBuffer", "ODDC", __LINE__);
+        //checkGlError("glBindBuffer", "ODDC", __LINE__);
 
 
         GLfloat *bufPt = &(s_odc_tess_work_buf[s_odc_tess_vertex_idx_this]);
         GLint mPosAttrib = glGetAttribLocation(program, "aPos");
-        checkGlError("mPosAttrib", "ODDC", __LINE__);
+        //checkGlError("mPosAttrib", "ODDC", __LINE__);
 
         GLint mUvAttrib = glGetAttribLocation(program, "aUV");
-        checkGlError("mUvAttrib", "ODDC", __LINE__);
+        //checkGlError("mUvAttrib", "ODDC", __LINE__);
         //GLint projection = glGetAttribLocation(program, "MVMatrix");
         //GLint modelView = glGetAttribLocation(program, "TransformMatrix");
         glVertexAttribPointer(mPosAttrib, 2, GL_FLOAT, GL_FALSE, 2*sizeof(float), bufPt);
-        checkGlError("glVertexAttribPointer", "ODDC", __LINE__);
+        //checkGlError("glVertexAttribPointer", "ODDC", __LINE__);
         glEnableVertexAttribArray(mPosAttrib);
-        checkGlError("glEnableVertexAttribArray", "ODDC", __LINE__);
+        //checkGlError("glEnableVertexAttribArray", "ODDC", __LINE__);
 
         // Bind our texture to the texturing target.
         glBindTexture( GL_TEXTURE_2D, textureID );
-        checkGlError("glBindTexture", "ODDC", __LINE__);
+        //checkGlError("glBindTexture", "ODDC", __LINE__);
 
         // Set up the texture sampler to texture unit 0
         GLint texUni = glGetUniformLocation( program, "uTexture" );
-        checkGlError("texUni", "ODDC", __LINE__);
+        //checkGlError("texUni", "ODDC", __LINE__);
         glUniform1i( texUni, 0 );
-        checkGlError("texUni", "ODDC", __LINE__);
+        //checkGlError("texUni", "ODDC", __LINE__);
 
 //        GLint texPOTWidth  = glGetUniformLocation( program, "texPOTWidth" );
 //        GLint texPOTHeight  = glGetUniformLocation( program, "texPOTHeight" );
@@ -2530,7 +2537,7 @@ void ODDC::DrawPolygonTessellatedPattern( int n, wxPoint points[], int textureID
         bcolorv[2] = m_brush.GetColour().Blue() / float(256);
         bcolorv[3] = m_brush.GetColour().Alpha() / float(256);
         GLint bcolloc = glGetUniformLocation(program, "uColour");
-        checkGlError("bcoloc", "ODDC", __LINE__);
+        //checkGlError("bcoloc", "ODDC", __LINE__);
         glUniform4fv(bcolloc, 1, bcolorv);
 #endif
         // Tesselate
@@ -2624,7 +2631,7 @@ void ODDC::DrawPolygonTessellatedPattern( int n, wxPoint points[], int textureID
 
     }
 #else
-#ifndef ANDROID
+#ifndef USE_ANDROID_GLES2
         m_tobj = gluNewTess();
 
         gluTessCallback( m_tobj, GLU_TESS_VERTEX, (_GLUfuncptr) &ODDCPatternvertexCallback );
@@ -2787,7 +2794,7 @@ void ODDC::DrawPolygonsTessellated( int n, int npoints[], wxPoint points[], wxCo
     }
 #ifdef ocpnUSE_GL
     else {
-#ifndef ANDROID
+#ifndef USE_ANDROID_GLES2
         m_tobj = gluNewTess();
 
         gluTessCallback( m_tobj, GLU_TESS_VERTEX, (_GLUfuncptr) &ODDCPatternvertexCallback );

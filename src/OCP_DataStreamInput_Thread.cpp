@@ -23,8 +23,6 @@
 
 #include "OCP_DataStreamInput_Thread.h"
 #include "OCPN_DataStreamEvent.h"
-//#include "datastream.h"
-//#include "dychart.h"
 #include "ropeless_pi.h"
 
 #ifdef __POSIX__

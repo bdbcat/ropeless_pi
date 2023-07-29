@@ -26,8 +26,13 @@
 #ifdef ocpnUSE_GL
 
 #include <wx/wx.h>
+
+#ifdef __ANDROID__
+#include <GLES2/gl2.h>
+#else
 #include <GL/gl.h>
 #include <GL/glu.h>
+#endif
 
 #include "TexFont.h"
 
@@ -200,6 +205,7 @@ void TexFont::GetTextExtent(const wxString &string, int *width, int *height)
 
 void TexFont::RenderGlyph( wchar_t c )
 {
+#if 0
     /* degree symbol */
     if(c == 0x00B0)
         c = DEGREE_GLYPH;
@@ -277,10 +283,12 @@ void TexFont::RenderGlyph( wchar_t c )
 
     glEnd();
     glTranslatef( tgic.advance, 0.0, 0.0 );
+#endif
 }
 
 void TexFont::RenderString( const wxString &string, int x, int y )
 {
+#if 0
     if(!texobj)
         return;
     
@@ -304,6 +312,7 @@ void TexFont::RenderString( const wxString &string, int x, int y )
 
     glPopMatrix();
     glPopMatrix();
+#endif
 }
 
 #endif     //#ifdef ocpnUSE_GL
