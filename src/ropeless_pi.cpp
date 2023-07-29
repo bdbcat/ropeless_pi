@@ -1735,10 +1735,10 @@ RopelessDialog::RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi,
         txs = GetTextExtent("LastReportTime (UTC)");
         m_pListCtrlTranponders->InsertColumn(tlTIMESTAMP, _("LastReportTime (UTC)"), wxLIST_FORMAT_CENTER, txs.x + dx*2);
 
-        txs = GetTextExtent("Color");
+        txs = GetTextExtent("Distance, M");
         m_pListCtrlTranponders->InsertColumn(tlDISTANCE, _("Distance, M"), wxLIST_FORMAT_CENTER, txs.x + dx*2);
 
-        txs = GetTextExtent("Distance, M");
+        txs = GetTextExtent("Depth, M");
         m_pListCtrlTranponders->InsertColumn(tlDEPTH, _("Depth, M"), wxLIST_FORMAT_CENTER, txs.x + dx*2);
 
         txs = GetTextExtent("Pings");
