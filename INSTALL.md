@@ -48,7 +48,8 @@ On windows, a different workflow is used:
 
     1.  Get and install from Android Playstore the free file manager application called XPlore.
     2.  Connect Android device to PC by USB cable.  Verify that PC has access to device.
-    3.  From PC, copy the attached tarball file to the device, at location like "Internal shared storage/Android/data/org.opencpn.opencpn/files"
+    3.  From PC, copy the plugin tarball file to the device, at location like "Internal shared storage/Android/data/org.opencpn.opencpn/files"
+        Chose the appropriate architecture, either armhf or aarch64 depending on the device capabilities.
     4.  Start OpenCPN on Android.  Exit OpenCPN.  This step validates OpenCPN configuration files.
     5.  Using XPlore, find and edit the file ".../Android/data/org.opencpn.opencpn/files/opencpn.conf"
     6.  Add the following to section [Plugins] (on next line):  CatalogExpert=1
