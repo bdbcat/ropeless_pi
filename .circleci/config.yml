@@ -181,11 +181,11 @@ workflows:
       - build-flatpak-x86-2008:
           <<: *std-filters
 
-      - build-macos:
-          <<: *std-filters
+      #- build-macos:
+      #    <<: *std-filters
 
-      - build-xenial:
-          <<: *std-filters
+      #- build-xenial:
+      #    <<: *std-filters
 
       - build-bionic-gtk3:
           <<: *std-filters
@@ -205,5 +205,5 @@ workflows:
       - build-android-armhf:
           <<: *std-filters
 
-      - build-raspbian-bullseye:
-          <<: *std-filters
+      #- build-raspbian-bullseye:
+      #    <<: *std-filters
