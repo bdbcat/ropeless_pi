@@ -1,0 +1,1 @@
+rm ~/.local/lib/opencpn/libropeless_pi.so

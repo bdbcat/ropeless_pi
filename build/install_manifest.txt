@@ -1,0 +1,1 @@
+/home/colin/ropeless_pi/build/app/files/lib/opencpn/libropeless_pi.so

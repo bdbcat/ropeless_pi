@@ -1,0 +1,8 @@
+# Hashes of file build rules.
+ecac328aeba9a930de79db880c56bed9 CMakeFiles/android-build
+ecac328aeba9a930de79db880c56bed9 CMakeFiles/ropeless-po-update
+ecac328aeba9a930de79db880c56bed9 CMakeFiles/ropeless-pot-update
+ecac328aeba9a930de79db880c56bed9 CMakeFiles/tarball-build
+7fb458ed074dfc1ecf4eb7c5ca84f07c android-conf-stamp
+a4e22f60e1d25daebdb79a1bbd061bdd po/ropeless_pi.pot.dummy
+327fc6ed5c1d89d7390052ec0962a0ff tarball-conf-stamp

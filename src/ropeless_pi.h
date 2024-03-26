@@ -81,6 +81,7 @@
 #define ID_EPL_DELETE           8867
 #define ID_EPL_XMIT             8868
 #define ID_TPR_RELEASE          8869
+#define ID_TPR_DELETE           8870
 
 //      Message IDs
 #define SIM_TIMER 5003
@@ -117,8 +118,6 @@ WX_DECLARE_OBJARRAY(vector2D *, ArrayOf2DPoints);
 //void RenderLine(int x1, int y1, int x2, int y2, wxColour color, int width);
 //void GLDrawLine( wxCoord x1, wxCoord y1, wxCoord x2, wxCoord y2 );
 //void RenderGLText( wxString &msg, wxFont *font, int xp, int yp, double angle);
-
-
 
 class transponder_state_history {
 public:
@@ -249,7 +248,6 @@ private:
       void RenderTrawls();
       void RenderTrawlConnector( transponder_state *state1, transponder_state *state2 );
 
-
       void ProcessRFACapture( void );
       void ProcessRLACapture( void );
 
@@ -362,8 +360,6 @@ private:
 
 };
 
-
-
 //      An event handler to manage timer ticks, and the like
 class PI_EventHandler : public wxEvtHandler
 {
@@ -382,14 +378,11 @@ private:
 
 };
 
-
 typedef enum BearingTypeEnum
 {
     MAG_BRG = 0,
     TRUE_BRG
 }_BearingTypeEnum;
-
-
 
 class RopelessDialog : public wxDialog
 {
@@ -411,7 +404,6 @@ public:
     wxComboBox *m_comboPort;
     wxArrayString *m_pSerialArray;
 
-
     wxComboBox  *m_wpComboPort;
 
     wxString  m_trackedPointName;
@@ -431,10 +423,9 @@ public:
 
     RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi, wxWindowID id = wxID_ANY, const wxString& title = _("Ropeless"), const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxDefaultSize, long style = wxCAPTION|wxDEFAULT_DIALOG_STYLE );
     ~RopelessDialog();
+
     void OnOKClick(wxCommandEvent& event);
-
     void OnClose(wxCloseEvent& event);
-
     void OnChooseFileButton(wxCommandEvent &event);
     void OnStopSimButton(wxCommandEvent &event);
     void OnStartSimButton(wxCommandEvent &event);
@@ -443,8 +434,6 @@ public:
     void OnTargetRightClick(wxListEvent &event);
 
     DECLARE_EVENT_TABLE()
-
-
 
 };
 

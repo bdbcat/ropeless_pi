@@ -1,0 +1,26 @@
+id: org.opencpn.OpenCPN.Plugin.ropeless
+runtime: org.opencpn.OpenCPN
+runtime-version: stable
+sdk: org.freedesktop.Sdk//22.08
+build-extension: true
+separate-locales: false
+appstream-compose: false
+modules:
+  - name: ropeless
+    no-autogen: true
+    cmake: true
+    build-options:
+      cflags: -fPIC
+      cxxflags: -fPIC -DFLATPAK
+    config-opts:
+      - -DCMAKE_INSTALL_PREFIX=/app/extensions/ropeless/
+      - -DCMAKE_BUILD_TYPE:STRING=Release
+      - -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON
+      - -DBUILD_TYPE:STRING=tarball
+      - -Uplugin_target
+    post-install:
+      - rm -f /app/extensions/ropeless/bin/*.so
+    sources:
+      - type: git
+        url: ..
+        branch: HEAD

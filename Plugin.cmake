@@ -66,6 +66,7 @@ SET(SRC_ROPELESS
     src/OCPNListCtrl.cpp
     src/pugixml.cpp
     src/mynumdlg.cpp
+    src/myokdlg.cpp
 )
 
 SET(SRC_NMEA0183
