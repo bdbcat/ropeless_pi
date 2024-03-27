@@ -932,7 +932,7 @@ void ropeless_pi::populateTransponderNode(pugi::xml_node &transponderNode,
 {
   pugi::xml_node child;
 
-  child = transponderNode.append_child("ident");
+  child = transponderNode.append_child("ID");
   wxString ss;
   ss.Printf("%d", state->ident);
   child.append_child(pugi::node_pcdata).set_value(ss.c_str());
@@ -991,7 +991,7 @@ bool ropeless_pi::parseTransponderNode(pugi::xml_node &transponderNode, transpon
         for (pugi::xml_node child = transponderNode.first_child(); child;
             child = child.next_sibling()) {
 
-          if (!strcmp(child.name(), "ident")) {
+          if (!strcmp(child.name(), "ID")) {
             state->ident = atoi(child.first_child().value());
           }
           if (!strcmp(child.name(), "identPartner")) {
@@ -1030,14 +1030,19 @@ void ropeless_pi::LoadTransponderStatus()
                            _T("ropeless-transponders.xml");
 
     if (!wxFileExists(fileName))
+    {
       return;
+    }
 
     bool ret = transponderStatusXML.load_file(fileName.mb_str());
-    if (ret) {
+
+    if (ret) 
+    {
       transponder_state state;
       pugi::xml_node transponderRoot = transponderStatusXML.first_child();
 
-      if (!parseTransponderNode(transponderRoot, &state)) {
+      if (!parseTransponderNode(transponderRoot, &state)) 
+      {
         OCPNMessageBox_PlugIn(GetOCPNCanvasWindow(), _("Error processing Ropeless Transponder status (XML) file."),
                        _("OpenCPN Ropeless Plugin Error"));
         return;
@@ -1045,21 +1050,41 @@ void ropeless_pi::LoadTransponderStatus()
     }
 
     pugi::xml_node statusRoot = transponderStatusXML.first_child();
-    for (pugi::xml_node element = statusRoot.first_child(); element;
-         element = element.next_sibling()) {
-      if (!strcmp(element.name(), "transponder")) {
+
+    for (pugi::xml_node element = statusRoot.first_child(); element;element = element.next_sibling()) 
+    {
+      if (!strcmp(element.name(), "transponder")) 
+      {
         transponder_state *this_state = new transponder_state;;
-        if(parseTransponderNode(element, this_state)){
+        if(parseTransponderNode(element, this_state))
+        {
           // Select a new color for this new transponder
-          this_state->color_index = m_colorIndexNext;
-          m_colorIndexNext++;
-          if(m_colorIndexNext == COLOR_TABLE_COUNT)
-            m_colorIndexNext = 0;
+
+          // HR MOD -- updated Color assignments
+          // Force Red for negative and Green for positive
+          if (this_state->ident > 0)
+          {
+            this_state->color_index = 0;
+          }
+          else
+          {
+            this_state->color_index = 1;
+          }
+
+          // this_state->color_index = m_colorIndexNext;
+          // m_colorIndexNext++;
+
+          // if(m_colorIndexNext == COLOR_TABLE_COUNT)
+          // {
+          //   m_colorIndexNext = 0;
+          // }
 
           transponderStatus.push_back( this_state );
         }
         else
+        {
           delete this_state;
+        }
       }
     }
 }
@@ -1081,11 +1106,11 @@ void ropeless_pi::RenderTransponder( transponder_state *state)
     m_oDC->SetPen( dpen );
     m_oDC->SetBrush( dbrush );
     m_oDC->DrawCircle( ab.x, ab.y, circle_size);
+
+    // TODO: Enable this?
     //wxString idStr = "1";
     //m_oDC->DrawText(idStr,ab.x,ab.y);  
-
     //void DrawText(const wxString &text, wxCoord x, wxCoord y);
-
     //m_oDC->RenderText(state->ident,*wxNORMAL_FONT,*wxBLACK,ab.x,ab.y,0 )
     //void RenderText( wxDC *dc, void *pgc, wxString &msg, wxFont *font, wxColour &color, int xp, int yp, double angle)
 
@@ -1107,16 +1132,18 @@ void ropeless_pi::RenderTransponder( transponder_state *state)
         m_oDC->DrawCircle( abh.x, abh.y, circle_size/2);
     }
 #endif
-    // Draw an "X" over the prinary target
-    if (state->ident != state->ident_partner){
-    wxPoint x1(ab.x - circle_size * .707, ab.y - circle_size * .707);
-    wxPoint x2(ab.x + circle_size * .707, ab.y + circle_size * .707);
-    wxPoint x3(ab.x - circle_size * .707, ab.y + circle_size * .707);
-    wxPoint x4(ab.x + circle_size * .707, ab.y - circle_size * .707);
-    wxPen xpen( *wxBLACK, 3 );
-    m_oDC->SetPen( xpen );
-    m_oDC->DrawLine(x1.x, x1.y, x2.x, x2.y, true);
-    m_oDC->DrawLine(x3.x, x3.y, x4.x, x4.y, true);
+
+    // Draw an "X" over the primary target
+    if (state->ident != state->ident_partner)
+    {
+      wxPoint x1(ab.x - circle_size * .707, ab.y - circle_size * .707);
+      wxPoint x2(ab.x + circle_size * .707, ab.y + circle_size * .707);
+      wxPoint x3(ab.x - circle_size * .707, ab.y + circle_size * .707);
+      wxPoint x4(ab.x + circle_size * .707, ab.y - circle_size * .707);
+      wxPen xpen( *wxBLACK, 3 );
+      m_oDC->SetPen( xpen );
+      m_oDC->DrawLine(x1.x, x1.y, x2.x, x2.y, true);
+      m_oDC->DrawLine(x3.x, x3.y, x4.x, x4.y, true);
     }
 }
 
@@ -1132,6 +1159,7 @@ void ropeless_pi::RenderTrawlConnector( transponder_state *state1, transponder_s
 
     m_oDC->DrawLine(P1.x, P1.y, P2.x, P2.y, true);
 }
+
 
 transponder_state *ropeless_pi::GetStateByIdent( int identTarget )
 {
@@ -1231,33 +1259,50 @@ bool ropeless_pi::RenderGLOverlay(wxGLContext *pcontext, PlugIn_ViewPort *vp)
 void ropeless_pi::ProcessRFACapture( void )
 {
   if( m_NMEA0183.LastSentenceIDReceived != _T("RFA") )
+  {
     return;
+  }
 
   int transponderIdent = m_NMEA0183.Rfa.TransponderCode;
 
   // Check if status for this transponder is in the status vector
   transponder_state *this_transponder_state = NULL;
-  for (unsigned int i = 0 ; i < transponderStatus.size() ; i++){
-    if (transponderStatus[i]->ident == transponderIdent){
+  for (unsigned int i = 0 ; i < transponderStatus.size() ; i++)
+  {
+    if (transponderStatus[i]->ident == transponderIdent)
+    {
       this_transponder_state = transponderStatus[i];
       break;
     }
   }
 
   // If not present, create a new record, and add to vector
-  if (this_transponder_state == NULL){
+  if (this_transponder_state == NULL)
+  {
     this_transponder_state = new transponder_state;
 
-    // Select a new color for this new transponder
-    this_transponder_state->color_index = m_colorIndexNext;
-    m_colorIndexNext++;
+    // HR MOD -- Red/Green based on ownership
+    if (transponderIdent > 0 )
+    {
+      this_transponder_state->color_index = 0;
+    }
+    else
+    {
+      this_transponder_state->color_index = 1;
+    }
 
-    if(m_colorIndexNext == COLOR_TABLE_COUNT)
-      m_colorIndexNext = 0;
+    // Select a new color for this new transponder
+    // this_transponder_state->color_index = m_colorIndexNext;
+    // m_colorIndexNext++;
+
+    // if(m_colorIndexNext == COLOR_TABLE_COUNT)
+    //   m_colorIndexNext = 0;
 
     transponderStatus.push_back( this_transponder_state );
   }
-  else {                         // Maintain history buffer
+  else 
+  {  
+    // Maintain history buffer
     transponder_state_history *this_transponder_state_history = new transponder_state_history;
     this_transponder_state_history->ident = this_transponder_state->ident;
     this_transponder_state_history->ident_partner = this_transponder_state->ident_partner;
@@ -1267,9 +1312,11 @@ void ropeless_pi::ProcessRFACapture( void )
     this_transponder_state_history->color_index = this_transponder_state->color_index;
     this_transponder_state_history->tsh_timer_age = HISTORY_FADE_SECS;
 
-    if (this_transponder_state->historyQ.size() > 10){
+    if (this_transponder_state->historyQ.size() > 10)
+    {
         this_transponder_state->historyQ.pop_back();
     }
+
     this_transponder_state->historyQ.push_front(this_transponder_state_history);
   }
 
@@ -1299,12 +1346,12 @@ void ropeless_pi::ProcessRFACapture( void )
   double ownship_lon = m_NMEA0183.Rfa.OwnshipPosition.Longitude.Longitude;
   double ownship_cog = m_NMEA0183.Rfa.OwnshipHeading;
 
-  if(m_pRLDialog){
+  if(m_pRLDialog)
+  {
     m_pRLDialog->RefreshTransponderList();
   }
 
   // Synthesize a RMC message, and send it upstream
-
   m_NMEA0183.Rmc.IsDataValid = NTrue;
   m_NMEA0183.Rmc.SpeedOverGroundKnots = 1.0;
   m_NMEA0183.Rmc.Position.Latitude.Set(ownship_lat);
@@ -1316,20 +1363,25 @@ void ropeless_pi::ProcessRFACapture( void )
 
   SENTENCE rmc_sentence;
   m_NMEA0183.Rmc.Write( rmc_sentence );
+
   PushNMEABuffer(rmc_sentence.Sentence);
 }
 
 void ropeless_pi::ProcessRLACapture( void )
 {
   if( m_NMEA0183.LastSentenceIDReceived != _T("RLA") )
+  {
     return;
+  }
 
   int transponderIdent = m_NMEA0183.Rla.TransponderCode;
 
   // Check if status for this transponder is in the status vector
   transponder_state *this_transponder_state = NULL;
-  for (unsigned int i = 0 ; i < transponderStatus.size() ; i++){
-    if (transponderStatus[i]->ident == transponderIdent){
+  for (unsigned int i = 0 ; i < transponderStatus.size() ; i++)
+  {
+    if (transponderStatus[i]->ident == transponderIdent)
+    {
       this_transponder_state = transponderStatus[i];
       break;
     }
@@ -1337,12 +1389,15 @@ void ropeless_pi::ProcessRLACapture( void )
 
   // If specified transponder is not present, ignore the message
   if (this_transponder_state == NULL)
+  {
     return;
+  }
 
   // Update the record
   this_transponder_state->release_status = m_NMEA0183.Rla.TransponderStatus;
 
-   if(m_pRLDialog){
+  if(m_pRLDialog)
+  {
     m_pRLDialog->RefreshTransponderList();
   }
 }
@@ -1350,17 +1405,22 @@ void ropeless_pi::ProcessRLACapture( void )
 void ropeless_pi::SetNMEASentence( wxString &sentence )
 {
     if (sentence.IsEmpty())
+    {
       return;
+    }
 
- printf("%s\n", sentence.ToStdString().c_str());
+    printf("%s\n", sentence.ToStdString().c_str());
     m_NMEA0183 << sentence;
 
-    if( m_NMEA0183.PreParse() ) {
-        if( m_NMEA0183.LastSentenceIDReceived == _T("RFA") ) {
+    if( m_NMEA0183.PreParse() ) 
+    {
+        if( m_NMEA0183.LastSentenceIDReceived == _T("RFA") ) 
+        {
             if( m_NMEA0183.Parse() )
                 ProcessRFACapture();
         }
-        if( m_NMEA0183.LastSentenceIDReceived == _T("RLA") ) {
+        if( m_NMEA0183.LastSentenceIDReceived == _T("RLA") ) 
+        {
             if( m_NMEA0183.Parse() )
                 ProcessRLACapture();
         }
@@ -1779,8 +1839,8 @@ RopelessDialog::RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi,
         wxSize txs = GetTextExtent("Color");
         m_pListCtrlTranponders->InsertColumn(tlICON, _("Color"), wxLIST_FORMAT_CENTER,  txs.x + dx*2);
 
-        txs = GetTextExtent("Ident");
-        m_pListCtrlTranponders->InsertColumn(tlIDENT, _("Ident"), wxLIST_FORMAT_CENTER,  txs.x + dx*2);
+        txs = GetTextExtent("ID");
+        m_pListCtrlTranponders->InsertColumn(tlIDENT, _("ID"), wxLIST_FORMAT_CENTER,  txs.x + dx*2);
 
         txs = GetTextExtent("Release Status");
         m_pListCtrlTranponders->InsertColumn(tlRELEASE_STATUS, _("Release Status"), wxLIST_FORMAT_CENTER, txs.x + dx*2);
