@@ -125,14 +125,15 @@ WX_DEFINE_OBJARRAY(ArrayOf2DPoints);
 
 #include "default_pi.xpm"
 
+// HR Mod
 wxString colorTableNames[] = {
-  "MAGENTA",
-  "CYAN",
+  //"MAGENTA",
+  //"CYAN",
   "LIME GREEN",
   "ORANGE",
-  "MEDIUM GOLDENROD"
+  //"MEDIUM GOLDENROD"
 };
-#define COLOR_TABLE_COUNT 5
+#define COLOR_TABLE_COUNT 2
 
 wxString msgFileName = "/home/dsr/Projects/ropeless_pi/NMEArevC_06072023.txt";
   //"/home/dsr/RFA01132022.txt"; //"/home/dsr/Projects/ropeless_pi/testset1.txt";
@@ -728,8 +729,7 @@ void ropeless_pi::PopupMenuHandler( wxCommandEvent& event )
             }
 
             m_pRLDialog->RefreshTransponderList();          
-          }
-          
+          }          
           handled = true;
           break;
         }
@@ -834,6 +834,7 @@ bool ropeless_pi::SendReleaseMessage(transponder_state *state, long code)
   else
     ret = false;
 
+  wxLogMessage(payload);
   return ret;
 }
 
@@ -1080,7 +1081,13 @@ void ropeless_pi::RenderTransponder( transponder_state *state)
     m_oDC->SetPen( dpen );
     m_oDC->SetBrush( dbrush );
     m_oDC->DrawCircle( ab.x, ab.y, circle_size);
+    //wxString idStr = "1";
+    //m_oDC->DrawText(idStr,ab.x,ab.y);  
 
+    //void DrawText(const wxString &text, wxCoord x, wxCoord y);
+
+    //m_oDC->RenderText(state->ident,*wxNORMAL_FONT,*wxBLACK,ab.x,ab.y,0 )
+    //void RenderText( wxDC *dc, void *pgc, wxString &msg, wxFont *font, wxColour &color, int xp, int yp, double angle)
 
 #if 0
     // Render the history buffer, if present
@@ -1101,6 +1108,7 @@ void ropeless_pi::RenderTransponder( transponder_state *state)
     }
 #endif
     // Draw an "X" over the prinary target
+    if (state->ident != state->ident_partner){
     wxPoint x1(ab.x - circle_size * .707, ab.y - circle_size * .707);
     wxPoint x2(ab.x + circle_size * .707, ab.y + circle_size * .707);
     wxPoint x3(ab.x - circle_size * .707, ab.y + circle_size * .707);
@@ -1109,7 +1117,7 @@ void ropeless_pi::RenderTransponder( transponder_state *state)
     m_oDC->SetPen( xpen );
     m_oDC->DrawLine(x1.x, x1.y, x2.x, x2.y, true);
     m_oDC->DrawLine(x3.x, x3.y, x4.x, x4.y, true);
-
+    }
 }
 
 void ropeless_pi::RenderTrawlConnector( transponder_state *state1, transponder_state *state2 )
@@ -1463,6 +1471,7 @@ bool ropeless_pi::MouseEventHook( wxMouseEvent &event )
     GetCanvasLLPix( &g_ovp, mp, &m_cursor_lat, &m_cursor_lon);
 
     m_foundState = NULL;
+    int transponderFoundID = 0;
 
     //  On right button push, find any transponders
     if( event.RightDown()) {
@@ -1475,6 +1484,7 @@ bool ropeless_pi::MouseEventHook( wxMouseEvent &event )
 
         if( ( a < m_selectRadius ) && ( b < m_selectRadius ) ){
           m_foundState = state;
+          transponderFoundID = transponderStatus[i]->ident;
           break;
         }
       }
@@ -1482,7 +1492,7 @@ bool ropeless_pi::MouseEventHook( wxMouseEvent &event )
 
     if( event.RightDown() ) {
 
-        // TODO: Allow user to delete transponder via right click here too
+        // TODO: Allow user to delete transponder via right click here too?
 
         if(1){
 
@@ -1491,12 +1501,21 @@ bool ropeless_pi::MouseEventHook( wxMouseEvent &event )
 
                 wxMenuItem *release_item = 0;
                 release_item = new wxMenuItem(contextMenu, ID_TPR_RELEASE, _("Release Transponder") );
+
+                wxMenuItem *id_item = 0;
+                wxString transponderIDString;
+                transponderIDString.Printf("ID: %d", transponderFoundID);
+                id_item = new wxMenuItem(contextMenu, ID_TPR_ID, _(transponderIDString) );
+
 #ifdef __ANDROID__
                 wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
                 release_item->SetFont(*pFont);
+                id_item->SetFont(*pFont);
 #endif
 
+                contextMenu->Append(id_item);
                 contextMenu->Append(release_item);
+
                 GetOCPNCanvasWindow()->Connect( ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
                                                 wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, this );
 
@@ -1507,7 +1526,6 @@ bool ropeless_pi::MouseEventHook( wxMouseEvent &event )
                     GetOCPNCanvasWindow()->Disconnect( ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
                                                    wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, this );
                 }
-
 
                 bret = true;                // I have eaten this event
             }
@@ -1839,6 +1857,11 @@ RopelessDialog::RopelessDialog( wxWindow* parent, ropeless_pi *parent_pi,
         bsizersimButtons->Add( m_StartSimButton, 0, wxALL, 5);
         m_StartSimButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnStartSimButton, this);
 
+        // CV MOD
+        m_ManualReleaseButton = new wxButton(this, wxID_ANY, _("Manual Release"),  wxDefaultPosition, wxDefaultSize, 0);
+        bsizersimButtons->Add( m_ManualReleaseButton, 0, wxALL, 5);
+        m_ManualReleaseButton->Bind(wxEVT_COMMAND_BUTTON_CLICKED, &RopelessDialog::OnManualReleaseButton, this);
+
         if (pParentPi->m_simulatorTimer.IsRunning()){
           m_StartSimButton->Hide();
           m_StopSimButton->Show();
@@ -2084,6 +2107,45 @@ void RopelessDialog::OnStartSimButton(wxCommandEvent &event)
    }
 }
 
+void RopelessDialog::OnManualReleaseButton(wxCommandEvent &event)
+{
+  transponder_state tmpState;
+
+  // spawn release that accepts ID number and send release command to Transceiver
+  wxString msg("Manually Enter Transponder ID to Release: ");
+
+  long result = -1;
+  myNumberEntryDialog dialog;
+
+#ifdef __ANDROID__
+  wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
+  dialog.SetFont(*pFont);
+#endif
+
+  dialog.Create(GetOCPNCanvasWindow(),
+                           msg,
+                           "Enter Transponder ID",
+                           "Ropeless Plugin Message",
+                           0, 0, 100000,
+                           wxDefaultPosition);
+
+  if (dialog.ShowModal() == wxID_OK)
+  {
+    result = dialog.GetValue();
+  }
+
+  if (result >= 0)
+  {
+    wxString s1;
+    s1.Printf("Manual Release Req for ID: %d\n", result);
+    wxLogMessage(s1);
+
+    // Create a transponder state just to spoof the release message
+    tmpState.ident = result;
+    g_ropelessPI->SendReleaseMessage(&tmpState, 0);
+  }
+}
+
 void RopelessDialog::OnClose(wxCloseEvent& event)
 {
 #ifndef __ANDROID__
@@ -2094,6 +2156,7 @@ void RopelessDialog::OnClose(wxCloseEvent& event)
   pParentPi->m_dialogSizeWidth = s.x;
   pParentPi->m_dialogSizeHeight = s.y;
 #endif
+  //wxLogMessage("Closing Ropeless window [x]...");
   event.Skip();
 }
 
@@ -2105,6 +2168,7 @@ void RopelessDialog::OnOKClick(wxCommandEvent& event)
     g_ropelessPI->stopSim();
 #endif
     //EndModal( wxID_OK );
+    //wxLogMessage("Closing Ropeless window [OK]...");
     Close();
 }
 

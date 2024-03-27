@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- colin-MS-7917 - 2403262323 -->
+<!-- colin-MS-7917 - 2403271613 -->
 <plugin version="1">
   <name> ropeless </name>
-  <version> 0.4.0.0+2403262323.17bf0fe </version>
+  <version> 0.4.0.0+2403271613.4b7d6a6 </version>
   <release> 0 </release>
   <summary> Ropeless Fishing Interface </summary>
 
@@ -17,6 +17,6 @@
   <target>ubuntu-wx32-x86_64</target>
   <target-version>22.04</target-version>
   <target-arch>x86_64</target-arch>
-  <tarball-url> https://dl.cloudsmith.io/public/david-register/ocpn-plugins-unstable/raw/names/ropeless-0.4-ubuntu-wx32-22.04-tarball/versions/0.4.0.0+2403262323.17bf0fe/ropeless-0.4.0.0+2403262323.17bf0fe_ubuntu-wx32-22.04-x86_64.tar.gz </tarball-url>
-  <tarball-checksum> c023dd6a8ba8e38841320a42332a8b5cb71b36eda4eb5bc254755a73a870ed93 </tarball-checksum>
+  <tarball-url> https://dl.cloudsmith.io/public/david-register/ocpn-plugins-unstable/raw/names/ropeless-0.4-ubuntu-wx32-22.04-tarball/versions/0.4.0.0+2403271613.4b7d6a6/ropeless-0.4.0.0+2403271613.4b7d6a6_ubuntu-wx32-22.04-x86_64.tar.gz </tarball-url>
+  <tarball-checksum> f998d03c7698a063fcc9374ffb6f8d347bab3d184c227fbe803fa9747cdf4b16 </tarball-checksum>
 </plugin>

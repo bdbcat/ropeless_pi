@@ -82,6 +82,8 @@
 #define ID_EPL_XMIT             8868
 #define ID_TPR_RELEASE          8869
 #define ID_TPR_DELETE           8870
+#define ID_TPR_ID               8871
+#define ID_TPR_MANUAL_RELEASE    8872
 
 //      Message IDs
 #define SIM_TIMER 5003
@@ -237,6 +239,7 @@ public:
      wxTimer m_simulatorTimer;
      int m_start_sim_id, m_stop_sim_id;
      transponder_state      *m_foundState;
+     bool SendReleaseMessage(transponder_state *state, long code);
 
 
 private:
@@ -258,7 +261,6 @@ private:
       bool parseTransponderNode(pugi::xml_node &transponderNode,
                             transponder_state *state);
 
-      bool SendReleaseMessage(transponder_state *state, long code);
       unsigned char ComputeChecksum( wxString msg );
 
 //      int CalculateFix( void );
@@ -416,7 +418,7 @@ public:
     wxTextCtrl *m_pTenderWidth;
 
     wxTextCtrl *m_simTextCtrl;
-    wxButton   *m_ChooseFileButton, *m_StopSimButton, *m_StartSimButton;
+    wxButton   *m_ChooseFileButton, *m_StopSimButton, *m_StartSimButton, *m_ManualReleaseButton;
 
     ropeless_pi *pParentPi;
     OCPNListCtrl *m_pListCtrlTranponders;
@@ -429,6 +431,7 @@ public:
     void OnChooseFileButton(wxCommandEvent &event);
     void OnStopSimButton(wxCommandEvent &event);
     void OnStartSimButton(wxCommandEvent &event);
+    void OnManualReleaseButton(wxCommandEvent &event);
     void RefreshTransponderList();
     void OnTargetListColumnClicked(wxListEvent &event);
     void OnTargetRightClick(wxListEvent &event);

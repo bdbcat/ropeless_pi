@@ -9,8 +9,8 @@ if [ -f ~/.config/local-build.rc ]; then source ~/.config/local-build.rc; fi
 if [ -z "$CLOUDSMITH_API_KEY" ]; then
     echo 'Warning: $CLOUDSMITH_API_KEY is not available, giving up.'
     echo 'Metadata: ropeless-0.4-ubuntu-wx32-22.04.xml'
-    echo 'Tarball: ropeless-0.4.0.0+2403262323.17bf0fe_ubuntu-wx32-22.04-x86_64.tar.gz'
-    echo 'Version: 0.4.0.0+2403262323.17bf0fe'
+    echo 'Tarball: ropeless-0.4.0.0+2403271613.4b7d6a6_ubuntu-wx32-22.04-x86_64.tar.gz'
+    echo 'Version: 0.4.0.0+2403271613.4b7d6a6'
     exit 0
 fi
 
@@ -21,14 +21,14 @@ set -xe
 
 cloudsmith push raw --no-wait-for-sync \
     --name ropeless-0.4-ubuntu-wx32-22.04-metadata \
-    --version 0.4.0.0+2403262323.17bf0fe \
+    --version 0.4.0.0+2403271613.4b7d6a6 \
     --summary "Plugin metadata for automatic installation" \
     --republish \
     david-register/ocpn-plugins-unstable ropeless-0.4-ubuntu-wx32-22.04.xml
 
 cloudsmith push raw --no-wait-for-sync \
     --name ropeless-0.4-ubuntu-wx32-22.04-tarball \
-    --version 0.4.0.0+2403262323.17bf0fe \
+    --version 0.4.0.0+2403271613.4b7d6a6 \
     --summary "Plugin tarball for automatic installation" \
     --republish \
-    david-register/ocpn-plugins-unstable ropeless-0.4.0.0+2403262323.17bf0fe_ubuntu-wx32-22.04-x86_64.tar.gz
+    david-register/ocpn-plugins-unstable ropeless-0.4.0.0+2403271613.4b7d6a6_ubuntu-wx32-22.04-x86_64.tar.gz
