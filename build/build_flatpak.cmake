@@ -15,7 +15,7 @@
       message(FATAL_ERROR "Cannot find generated file libropeless_pi.so")
     endif ()
     execute_process(
-      COMMAND bash -c "sed -e '/@checksum@/d'           < ropeless-0.4-ubuntu-wx32-22.04.xml.in > app/files/metadata.xml"
+      COMMAND bash -c "sed -e '/@checksum@/d'           < ropeless-2.1-ubuntu-wx32-22.04.xml.in > app/files/metadata.xml"
     )
     if (Debug MATCHES Release|MinSizeRel)
       message(STATUS "Stripping app/files/lib/opencpn/libropeless_pi.so")
@@ -25,17 +25,17 @@
     endif ()
     execute_process(
       WORKING_DIRECTORY /home/colin/ropeless_pi/build/app
-      COMMAND mv -fT files ropeless-0.4-ubuntu-wx32-22.04
+      COMMAND mv -fT files ropeless-2.1-ubuntu-wx32-22.04
     )
     execute_process(
       WORKING_DIRECTORY  /home/colin/ropeless_pi/build/app
       COMMAND
         cmake -E
-        tar -czf ../ropeless-0.4.0.0+2403272137.829f5d9_ubuntu-wx32-22.04-x86_64.tar.gz --format=gnutar ropeless-0.4-ubuntu-wx32-22.04
+        tar -czf ../ropeless-2.1.0.0+2403281537.36e8a64_ubuntu-wx32-22.04-x86_64.tar.gz --format=gnutar ropeless-2.1-ubuntu-wx32-22.04
     )
-    message(STATUS "Building ropeless-0.4.0.0+2403272137.829f5d9_ubuntu-wx32-22.04-x86_64.tar.gz")
+    message(STATUS "Building ropeless-2.1.0.0+2403281537.36e8a64_ubuntu-wx32-22.04-x86_64.tar.gz")
     execute_process(
       COMMAND cmake -P /home/colin/ropeless_pi/build/checksum.cmake
     )
-    message(STATUS "Computing checksum in ropeless-0.4-ubuntu-wx32-22.04.xml")
+    message(STATUS "Computing checksum in ropeless-2.1-ubuntu-wx32-22.04.xml")
   

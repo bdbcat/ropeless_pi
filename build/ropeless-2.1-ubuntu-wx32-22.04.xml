@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- colin-MS-7917 - 2403281537 -->
+<plugin version="1">
+  <name> ropeless </name>
+  <version> 2.1.0.0+2403281537.36e8a64 </version>
+  <release> 0 </release>
+  <summary> Ropeless Fishing Interface </summary>
+
+  <api-version> 1.16 </api-version>
+  <open-source>  </open-source>
+  <author> Dave register </author>
+  <source> https://github.com/bdbcat/o-charts_pi </source>
+  <info-url> https://o-charts.org/ </info-url>
+
+  <description>  Ropeless Fishing Plugin </description>
+
+  <target>ubuntu-wx32-x86_64</target>
+  <target-version>22.04</target-version>
+  <target-arch>x86_64</target-arch>
+  <tarball-url> https://dl.cloudsmith.io/public/david-register/ocpn-plugins-unstable/raw/names/ropeless-2.1-ubuntu-wx32-22.04-tarball/versions/2.1.0.0+2403281537.36e8a64/ropeless-2.1.0.0+2403281537.36e8a64_ubuntu-wx32-22.04-x86_64.tar.gz </tarball-url>
+  <tarball-checksum> 3b5f1041943477256b5a3f9bda116f87bb49c5769345f8b571e07cf3bbe456f4 </tarball-checksum>
+</plugin>

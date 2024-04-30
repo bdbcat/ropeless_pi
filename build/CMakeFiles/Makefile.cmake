@@ -66,7 +66,7 @@ set(CMAKE_MAKEFILE_PRODUCTS
   "include/config.h"
   "upload.sh"
   "upload.bat"
-  "ropeless-0.4-ubuntu-wx32-22.04.xml.in"
+  "ropeless-2.1-ubuntu-wx32-22.04.xml.in"
   "CMakeFiles/CMakeDirectoryInformation.cmake"
   "opencpn-libs/api-16/CMakeFiles/CMakeDirectoryInformation.cmake"
   "opencpn-libs/opencpn-glu/CMakeFiles/CMakeDirectoryInformation.cmake"

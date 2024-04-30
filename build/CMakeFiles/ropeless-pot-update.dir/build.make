@@ -72,7 +72,7 @@ CMakeFiles/ropeless-pot-update: po/ropeless_pi.pot.dummy
 po/ropeless_pi.pot.dummy: po/POTFILES.in
 po/ropeless_pi.pot.dummy: po/ropeless_pi.pot
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --blue --bold --progress-dir=/home/colin/ropeless_pi/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "ropeless-pot-update [ropeless_pi]: Generated pot file."
-	cd /home/colin/ropeless_pi && /usr/bin/xgettext --force-po --package-name=ropeless_pi --package-version="0.4.0.0" --output=po/ropeless_pi.pot --keyword=_ --width=80 --files-from=/home/colin/ropeless_pi/po/POTFILES.in
+	cd /home/colin/ropeless_pi && /usr/bin/xgettext --force-po --package-name=ropeless_pi --package-version="2.1.0.0" --output=po/ropeless_pi.pot --keyword=_ --width=80 --files-from=/home/colin/ropeless_pi/po/POTFILES.in
 
 ropeless-pot-update: CMakeFiles/ropeless-pot-update
 ropeless-pot-update: po/ropeless_pi.pot.dummy

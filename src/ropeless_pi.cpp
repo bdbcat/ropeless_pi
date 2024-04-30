@@ -1108,11 +1108,11 @@ void ropeless_pi::RenderTransponder( transponder_state *state)
     m_oDC->DrawCircle( ab.x, ab.y, circle_size);
 
     // TODO: Enable this?
-    //wxString idStr = "1";
-    //m_oDC->DrawText(idStr,ab.x,ab.y);  
-    //void DrawText(const wxString &text, wxCoord x, wxCoord y);
-    //m_oDC->RenderText(state->ident,*wxNORMAL_FONT,*wxBLACK,ab.x,ab.y,0 )
-    //void RenderText( wxDC *dc, void *pgc, wxString &msg, wxFont *font, wxColour &color, int xp, int yp, double angle)
+    // wxString idStr = "1";
+    // m_oDC->DrawText(idStr,ab.x,ab.y);  
+    // void DrawText(const wxString &text, wxCoord x, wxCoord y);
+    // m_oDC->RenderText(state->ident,*wxNORMAL_FONT,*wxBLACK,ab.x,ab.y,0 )
+    // void RenderText( wxDC *dc, void *pgc, wxString &msg, wxFont *font, wxColour &color, int xp, int yp, double angle)
 
 #if 0
     // Render the history buffer, if present

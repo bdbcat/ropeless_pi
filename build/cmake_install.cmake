@@ -64,7 +64,7 @@ endif()
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
   
     configure_file(
-      /home/colin/ropeless_pi/build/ropeless-0.4-ubuntu-wx32-22.04.xml.in
+      /home/colin/ropeless_pi/build/ropeless-2.1-ubuntu-wx32-22.04.xml.in
       /home/colin/ropeless_pi/build/app/files/metadata.xml
       @ONLY
     )
