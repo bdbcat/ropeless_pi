@@ -1,7 +1,9 @@
 # TODO
 ## Colin Vincent 
 ## 3/26/24
+## Updated 5/28/24
 
+[x] - Add debug message for RSRFA messages to opencpn.log
 [x] - Add delete option on right click
 [] - Fix scaling
 [] - Fix Close / X buttons not working

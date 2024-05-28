@@ -1412,6 +1412,9 @@ void ropeless_pi::SetNMEASentence( wxString &sentence )
     printf("%s\n", sentence.ToStdString().c_str());
     m_NMEA0183 << sentence;
 
+    // CTV Log new NMEA sentences for debugging use
+    wxLogMessage(sentence);
+
     if( m_NMEA0183.PreParse() ) 
     {
         if( m_NMEA0183.LastSentenceIDReceived == _T("RFA") ) 
