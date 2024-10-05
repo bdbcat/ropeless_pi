@@ -235,6 +235,7 @@ public:
      int  m_dialogSizeHeight;
      int  m_dialogPosX;
      int  m_dialogPosY;
+     RopelessDialog* m_pRLDialog;
 
      wxTimer m_simulatorTimer;
      int m_start_sim_id, m_stop_sim_id;
@@ -351,7 +352,6 @@ private:
 
      int                    m_leftclick_tool_id;
 
-     RopelessDialog         *m_pRLDialog;
      wxWindow               *m_parent_window;
      double                 m_selectRadius;
 

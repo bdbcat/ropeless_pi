@@ -2220,7 +2220,9 @@ void RopelessDialog::OnClose(wxCloseEvent& event)
   pParentPi->m_dialogSizeHeight = s.y;
 #endif
   //wxLogMessage("Closing Ropeless window [x]...");
-  event.Skip();
+  //event.Skip();
+  Destroy();
+  pParentPi->m_pRLDialog = NULL;
 }
 
 void RopelessDialog::OnOKClick(wxCommandEvent& event)
