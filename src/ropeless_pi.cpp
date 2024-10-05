@@ -521,7 +521,11 @@ wxString ropeless_pi::GetLongDescription()
 void ropeless_pi::OnToolbarToolCallback(int id) {
   //if (!m_buseable) return;
   if (NULL == m_pRLDialog) {
-    m_pRLDialog = new RopelessDialog(m_parent_window, this);
+    m_pRLDialog = new RopelessDialog(m_parent_window, this,
+                                         -1, "Ropeless Fishing",
+                                         wxDefaultPosition,
+                                         wxDefaultSize,
+                                         wxCAPTION | wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
     wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
     m_pRLDialog->SetFont(*pFont);
 
