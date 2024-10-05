@@ -124,6 +124,7 @@ double tstamp_current;
 WX_DEFINE_OBJARRAY(ArrayOf2DPoints);
 
 #include "default_pi.xpm"
+#include "ocpn_plugin.h"
 
 // HR Mod
 wxString colorTableNames[] = {
@@ -424,10 +425,20 @@ int ropeless_pi::Init( void )
 //    SetCanvasContextMenuItemViz(m_stop_sim_id, false);
 
     //    This PlugIn needs a toolbar icon, so request its insertion
-    m_leftclick_tool_id =
-    InsertPlugInTool(_T(""), _img_plus, _img_plus, wxITEM_NORMAL, _("Ropeless"),
-                         _T(""), NULL, -1, 0, this);
 
+    wxFileName fn;
+    wxString tmp_path;
+    tmp_path = GetPluginDataDir("ropeless_pi");
+    fn.SetPath(tmp_path);
+    fn.AppendDir(_T("data"));
+
+    fn.SetFullName(_T("rsi-icon-color-solid.svg"));
+    wxString tb_icon = fn.GetFullPath();
+
+    InsertPlugInToolSVG("Ropeless",
+                        tb_icon, tb_icon, tb_icon,
+                        wxITEM_CHECK, "Ropekless", "", NULL,
+                        -1, 0, this);
 
     return (WANTS_OVERLAY_CALLBACK |
             WANTS_OPENGL_OVERLAY_CALLBACK |
