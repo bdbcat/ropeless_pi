@@ -1990,43 +1990,56 @@ void RopelessDialog::OnTargetRightClick(wxListEvent &event) {
               flags);
 
     if( index >= 0 ) {
+        wxString sID = m_pListCtrlTranponders->GetItemText(index, 1);
+        long fid = atoi(sID.ToStdString().c_str());
+        // search the transponder list for an ident match
+        long foundIndex = -1;
+        for (unsigned int i = 0; i < transponderStatus.size(); i++) {
+            transponder_state *state = transponderStatus[i];
+            if (state->ident == fid) {
+                foundIndex = i;
+                break;
+            }
+        }
 
-      g_ropelessPI->m_foundState = transponderStatus[index];
+        if (foundIndex >= 0) {
+            g_ropelessPI->m_foundState = transponderStatus[foundIndex];
 
-      wxMenu* contextMenu = new wxMenu;
-      wxMenuItem *release_item = 0;
-      wxMenuItem *delete_item = 0;
+            wxMenu *contextMenu = new wxMenu;
+            wxMenuItem *release_item = 0;
+            wxMenuItem *delete_item = 0;
 
-      release_item = new wxMenuItem(contextMenu, ID_TPR_RELEASE, _("Release Transponder") );
-      delete_item = new wxMenuItem(contextMenu, ID_TPR_DELETE, _("Delete") );
+            release_item = new wxMenuItem(contextMenu, ID_TPR_RELEASE, _("Release Transponder"));
+            delete_item = new wxMenuItem(contextMenu, ID_TPR_DELETE, _("Delete"));
 
 #ifdef __ANDROID__
-      wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
-      release_item->SetFont(*pFont);
+            wxFont *pFont = OCPNGetFont(_T("Dialog"), 0);
+            release_item->SetFont(*pFont);
 #endif
+            contextMenu->Append(release_item);
+            contextMenu->Append(delete_item);
 
-      contextMenu->Append(release_item);
-      contextMenu->Append(delete_item);
+            GetOCPNCanvasWindow()->Connect(ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
+                                           wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL, pParentPi);
 
-      GetOCPNCanvasWindow()->Connect( ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
-               wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, pParentPi );
+            GetOCPNCanvasWindow()->Connect(ID_TPR_DELETE, wxEVT_COMMAND_MENU_SELECTED,
+                                           wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL, pParentPi);
 
-      GetOCPNCanvasWindow()->Connect( ID_TPR_DELETE, wxEVT_COMMAND_MENU_SELECTED,
-               wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, pParentPi );
+            //   Invoke the drop-down menu
+            GetOCPNCanvasWindow()->PopupMenu(contextMenu, wxGetMousePosition().x, wxGetMousePosition().y);
 
-      //   Invoke the drop-down menu
-      GetOCPNCanvasWindow()->PopupMenu( contextMenu, wxGetMousePosition().x, wxGetMousePosition().y );
+            if (release_item)
+                GetOCPNCanvasWindow()->Disconnect(ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
+                                                  wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL,
+                                                  pParentPi);
 
-      if(release_item)
-        GetOCPNCanvasWindow()->Disconnect( ID_TPR_RELEASE, wxEVT_COMMAND_MENU_SELECTED,
-           wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, pParentPi );
-
-      if(delete_item)
-        GetOCPNCanvasWindow()->Disconnect( ID_TPR_DELETE, wxEVT_COMMAND_MENU_SELECTED,
-           wxCommandEventHandler( ropeless_pi::PopupMenuHandler ), NULL, pParentPi );
-
+            if (delete_item)
+                GetOCPNCanvasWindow()->Disconnect(ID_TPR_DELETE, wxEVT_COMMAND_MENU_SELECTED,
+                                                  wxCommandEventHandler(ropeless_pi::PopupMenuHandler), NULL,
+                                                  pParentPi);
+            }
+        }
     }
-  }
 }
 
 void RopelessDialog::OnTargetListColumnClicked(wxListEvent &event) {
