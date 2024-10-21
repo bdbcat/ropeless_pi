@@ -14,16 +14,20 @@
 set -xe
 
 # Read configuration and check if we should really build this
-#here=$(cd $(dirname $0); pwd -P)
-#source $here/../build-conf.rc
-#if [ "$android_build_rate" -eq 0 ]; then exit 0; fi
-#if [ $((CIRCLE_BUILD_NUM % android_build_rate)) -ne 0 ]; then
-#    exit 0
-#fi
+here=$(cd $(dirname $0); pwd -P)
+source $here/../build-conf.rc
+if [ "$android_build_rate" -eq 0 ]; then exit 0; fi
+if [ $((CIRCLE_BUILD_NUM % android_build_rate)) -ne 0 ]; then
+    exit 0
+fi
 
 # Load local environment if it exists i. e., this is a local build
 if [ -f ~/.config/local-build.rc ]; then source ~/.config/local-build.rc; fi
 if [ -d /ci-source ]; then cd /ci-source; fi
+
+# Handle possible outdated key for google packages, see #487
+curl https://packages.cloud.google.com/apt/doc/apt-key.gpg \
+    | sudo apt-key add -
 
 git submodule update --init opencpn-libs
 
@@ -39,10 +43,9 @@ exec > >(tee $builddir/build.log) 2>&1
 # The local container needs to access the cache directory
 test -d cache || sudo mkdir cache
 test -w cache || sudo chmod -R go+w cache || :
+ 
 
-sudo apt-key adv --keyserver hkps://keyserver.ubuntu.com:443 --recv-keys B53DC80D13EDEF05
-sudo apt -qq update
-#sudo apt-get --allow-unauthenticated update
+sudo apt -q update
 sudo apt install -q cmake git gettext
 
 # Install cloudsmith-cli (for upload) and cryptography (for git-push)
@@ -58,7 +61,9 @@ python3 -m pip install --user -q cmake
 # Build tarball
 cd $builddir
 
-sudo ln -sf /opt/android/android-ndk-* /opt/android/ndk
+last_ndk=$(ls -d /home/circleci/android-sdk/ndk/* | tail -1)
+test -d /opt/android || sudo mkdir -p /opt/android
+sudo ln -sf $last_ndk /opt/android/ndk
 cmake -DCMAKE_TOOLCHAIN_FILE=cmake/$OCPN_TARGET-toolchain.cmake ..
 make VERBOSE=1
 
