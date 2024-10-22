@@ -15,7 +15,7 @@
 // myOkDialog: a dialog with [ok] and [cancel] buttons
 // ----------------------------------------------------------------------------
 
-class WXDLLIMPEXP_CORE myOkDialog : public wxDialog
+class myOkDialog : public wxDialog
 {
 public:
     myOkDialog()

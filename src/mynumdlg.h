@@ -15,7 +15,7 @@
 // myNumberEntryDialog: a dialog with spin control, [ok] and [cancel] buttons
 // ----------------------------------------------------------------------------
 
-class WXDLLIMPEXP_CORE myNumberEntryDialog : public wxDialog
+class myNumberEntryDialog : public wxDialog
 {
 public:
     myNumberEntryDialog()
@@ -66,7 +66,7 @@ private:
 // function to get a number from user
 // ----------------------------------------------------------------------------
 
-WXDLLIMPEXP_CORE long
+long
     myGetNumberFromUser(const wxString& message,
                         const wxString& prompt,
                         const wxString& caption,

@@ -32,7 +32,7 @@
 #include "wx/wx.h"
 #endif
 
-#ifdef __MSVC__
+#ifdef WIN32
 #include <windows.h>
 #endif
 
@@ -45,7 +45,14 @@
         #include <GLES2/gl2.h>
         #include "qdebug.h"
     #else
-        #include <GL/gl.h>
+        #ifdef WIN32        
+            #include <gl/gl.h>
+            #define GL_SMOOTH_LINE_WIDTH_RANGE 2850
+            #define GL_ALIASED_LINE_WIDTH_RANGE 2850
+        #else
+            #include <GL/gl.h>
+        #endif
+
     #endif
 
 #include <wx/glcanvas.h>
@@ -1548,7 +1555,7 @@ void ODDC::DrawDisk( wxCoord x, wxCoord y, wxCoord innerRadius, wxCoord outerRad
         int npoints[2];
         npoints[0] = (int) innerSteps;
         npoints[1] = (int) outerSteps;
-        DrawPolygonsTessellated( 2, npoints, disk, 0, 0 );
+        //DrawPolygonsTessellated( 2, npoints, disk, 0, 0 );
         delete [] disk;
     }
 #endif
@@ -1656,7 +1663,7 @@ void ODDC::DrawPolygon( int n, wxPoint points[], wxCoord xoffset, wxCoord yoffse
 #endif
 
         if(g_textureId >= 0){
-            DrawPolygonPattern(n, points, g_textureId, wxSize(g_iTextureWidth, g_iTextureHeight), xoffset, yoffset );
+            //DrawPolygonPattern(n, points, g_textureId, wxSize(g_iTextureWidth, g_iTextureHeight), xoffset, yoffset );
             return;
         }
 
@@ -1951,7 +1958,7 @@ void ODDC::DrawPolygonPattern( int n, wxPoint points[], int textureID, wxSize te
 
         if(n > 3) {
            if(ConfigureBrush()) {       // Check for transparent brush
-                DrawPolygonTessellatedPattern( n, points, textureID, textureSize, xoffset, yoffset);
+                //DrawPolygonTessellatedPattern( n, points, textureID, textureSize, xoffset, yoffset);
             }
 
         }
@@ -2042,8 +2049,11 @@ void ODDC::DrawPolygonPattern( int n, wxPoint points[], int textureID, wxSize te
 #else           // USE_ANDROID_GLES2
 
         {
-            if(ConfigureBrush())        // Check for transparent brush
-                DrawPolygonTessellatedPattern( n, points, textureID, textureSize, xoffset, yoffset);
+          if (ConfigureBrush())  // Check for transparent brush
+          {
+            // DrawPolygonTessellatedPattern( n, points, textureID, textureSize,
+            // xoffset, yoffset);
+          }
         }
 #endif
 
@@ -2251,6 +2261,7 @@ void odc_endCallbackD_GLSL(void *data)
 
 #endif          //#ifdef ocpnUSE_GL
 
+#if 0
 void ODDC::DrawPolygonTessellated( int n, wxPoint points[], wxCoord xoffset, wxCoord yoffset )
 {
     if( dc )
@@ -2383,6 +2394,7 @@ void ODDC::DrawPolygonTessellated( int n, wxPoint points[], wxCoord xoffset, wxC
 #endif
 #endif
 }
+#endif
 
 #ifdef ocpnUSE_GL
 #ifndef USE_ANDROID_GLES2
@@ -2431,7 +2443,7 @@ void __CALL_CONVENTION ODDCPatternendCallback()
 #endif
 #endif          //#ifdef ocpnUSE_GL
 
-
+#if 0
 void ODDC::DrawPolygonTessellatedPattern( int n, wxPoint points[], int textureID, wxSize textureSize, wxCoord xoffset, wxCoord yoffset )
 {
     if( dc )
@@ -2677,6 +2689,7 @@ void ODDC::DrawPolygonTessellatedPattern( int n, wxPoint points[], int textureID
 #endif
 #endif
 }
+#endif
 
 #if 0
 
@@ -2782,6 +2795,7 @@ void ODDC::DrawPolygonTessellated( int n, wxPoint points[], wxCoord xoffset, wxC
 }
 #endif
 
+#if 0
 void ODDC::DrawPolygonsTessellated( int n, int npoints[], wxPoint points[], wxCoord xoffset, wxCoord yoffset )
 {
 #if 1
@@ -2845,7 +2859,7 @@ void ODDC::DrawPolygonsTessellated( int n, int npoints[], wxPoint points[], wxCo
 #endif
 #endif
 }
-
+#endif
 void ODDC::DrawPolygons(int n, int npoint[], wxPoint points[], wxCoord xoffset, wxCoord yoffset)
 {
     if(g_textureId >= 0)
@@ -2856,7 +2870,7 @@ void ODDC::DrawPolygonsPattern( int n, int npoint[], wxPoint points[], int textu
 {
 #ifndef ANDROID
 
-    DrawPolygonsTessellated( n, npoint, points);
+    //DrawPolygonsTessellated( n, npoint, points);
 
 #else
         // Pre-configure the GLES program
