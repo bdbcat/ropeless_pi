@@ -21,11 +21,9 @@
 - Switch to the Plugin source folder `cd C:\Projects\ropeless_pi`
 - Create the build folder `mkdir build`
 - Switch to the build folder `cd build`
-- Run `set "wxWidgets_ROOT_DIR=C:\Projects\ropeless_pi\cache\wxWidgets"`
-- Run `set "wxWidgets_LIB_DIR=C:\Projects\ropeless_pi\cache\wxWidgets\lib\vc_dll"`
 - Run `set "WXWIN=%wxWidgets_ROOT_DIR%"`
 - Run `set PATH=%PATH%;C:\Program Files (x86)\Poedit\GettextTools\bin`
-- Configure the build environment `cmake -A Win32 -G "Visual Studio 17 2022" -DCMAKE_GENERATOR_PLATFORM=Win32     ..`
+- Configure the build environment `cmake -A Win32 -G "Visual Studio 17 2022" -DCMAKE_GENERATOR_PLATFORM=Win32 -DwxWidgets_LIB_DIR=C:/Projects/ropeless_pi/cache/wxWidgets/lib/vc_dll -DwxWidgets_ROOT_DIR=C:/Projects/ropeless_pi/cache/wxWidgets  ..`
 - Build the plugin `cmake --build . --config Release --target tarball`
 - The plugin tarball should be successfully built
 - The solution file `ropeless_pi.sln` can be opened in Visual Studio and you can perform builds from within the IDE
